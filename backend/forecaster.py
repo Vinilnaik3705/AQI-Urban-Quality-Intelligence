@@ -400,9 +400,9 @@ class AQIForecaster:
             pred_pm25_val = float(pm25_model.predict([feature_row])[0])
             pred_pm10_val = float(pm10_model.predict([feature_row])[0])
 
-            # Ensure non-negative
-            pred_pm25_val = max(0.0, pred_pm25_val)
-            pred_pm10_val = max(0.0, pred_pm10_val)
+            # Ensure non-negative and cap at realistic levels for the model
+            pred_pm25_val = max(0.0, min(pred_pm25_val, 200.0))
+            pred_pm10_val = max(0.0, min(pred_pm10_val, 350.0))
 
             # Update rolling window
             pm25_window.append(pred_pm25_val)
@@ -419,9 +419,10 @@ class AQIForecaster:
             om_o3 = forecast_raw_aqi["o3"][h] or 0.0
 
 
-            # Calculate AQIs
-            predicted_aqi = calculate_indian_aqi(pred_pm25_val, pred_pm10_val, om_no2, om_so2, om_co, om_o3)
-            open_meteo_raw_aqi = calculate_indian_aqi(om_pm25, om_pm10, om_no2, om_so2, om_co, om_o3)
+            # Calculate AQIs and cap at realistic ceiling
+            predicted_aqi = min(calculate_indian_aqi(pred_pm25_val, pred_pm10_val, om_no2, om_so2, om_co, om_o3), 350.0)
+            predicted_aqi_us = min(calculate_us_aqi(pred_pm25_val, pred_pm10_val, om_no2, om_so2, om_co, om_o3), 300.0)
+            open_meteo_raw_aqi = min(calculate_indian_aqi(om_pm25, om_pm10, om_no2, om_so2, om_co, om_o3), 350.0)
             
             confidence_val = max(0.30, 0.95 - (h * 0.007))
             
@@ -433,6 +434,7 @@ class AQIForecaster:
                 "timestamp": dt.isoformat(),
                 "hour_offset": h + 1,
                 "predicted_aqi": round(predicted_aqi, 1),
+                "predicted_aqi_us": round(predicted_aqi_us, 1),
                 "confidence_low": round(confidence_low, 1),
                 "confidence_high": round(confidence_high, 1),
                 "open_meteo_raw": round(open_meteo_raw_aqi, 1),

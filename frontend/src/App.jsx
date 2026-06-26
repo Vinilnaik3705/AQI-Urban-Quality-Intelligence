@@ -1056,7 +1056,7 @@ function ForecastView({ state, forecast, hours, onChangeHours, selectedWard, onS
     const entry = forecast[entryIndex];
     const wForecast = entry?.wards?.find(w => w.ward_id === currentWard?.id) || entry?.wards?.[0];
     
-    baselineAqi = wForecast ? Math.round(wForecast.predicted_aqi) : 0;
+    baselineAqi = wForecast ? Math.round(aqiStandard === 'US' ? (wForecast.predicted_aqi_us ?? wForecast.predicted_aqi) : wForecast.predicted_aqi) : 0;
     mitigatedAqi = getMitigatedVal(baselineAqi, selectedOffset);
     
     const wsKmh = wForecast?.wind_speed_kmh || 12.6;
@@ -1093,7 +1093,7 @@ function ForecastView({ state, forecast, hours, onChangeHours, selectedWard, onS
     forecast.forEach((f, idx) => {
       chartLabels.push(`+${f.hour_offset}h`);
       const wForecast = f.wards?.find(w => w.ward_id === currentWard?.id) || f.wards?.[0];
-      const baseVal = wForecast ? Math.round(wForecast.predicted_aqi) : 0;
+      const baseVal = wForecast ? Math.round(aqiStandard === 'US' ? (wForecast.predicted_aqi_us ?? wForecast.predicted_aqi) : wForecast.predicted_aqi) : 0;
       baselineDataset.push(baseVal);
       mitigatedDataset.push(getMitigatedVal(baseVal, f.hour_offset));
 
@@ -1142,11 +1142,12 @@ function ForecastView({ state, forecast, hours, onChangeHours, selectedWard, onS
                 w.ward_id.startsWith('bengaluru_') || w.ward_id.startsWith('chennai_') ||
                 w.ward_id.startsWith('hyderabad_') || w.ward_id.startsWith('kolkata_')
               );
+              const forecastAqi = aqiStandard === 'US' ? (w.predicted_aqi_us ?? w.predicted_aqi) : w.predicted_aqi;
               return (
               <Marker
                 key={w.ward_id}
                 position={w.center}
-                icon={createAqiIcon(w.predicted_aqi, isWard)}
+                icon={createAqiIcon(forecastAqi, isWard)}
                 eventHandlers={{
                   click: () => {
                     const matched = state.wards.find(ward => ward.id === w.ward_id);
@@ -1157,8 +1158,8 @@ function ForecastView({ state, forecast, hours, onChangeHours, selectedWard, onS
                 <Popup>
                   <div>
                     <strong>{w.ward_name}</strong><br />
-                    Predicted AQI: <strong style={{ color: aqiColor(w.predicted_aqi) }}>
-                      {w.predicted_aqi}
+                    Predicted AQI: <strong style={{ color: aqiColor(forecastAqi) }}>
+                      {forecastAqi}
                     </strong><br />
                     Confidence: {(w.confidence * 100).toFixed(0)}%
                   </div>

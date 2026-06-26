@@ -258,6 +258,7 @@ async def get_forecast(
                     
                     # Update ward fields with ML data
                     w["predicted_aqi"] = ml_hour_data["predicted_aqi"]
+                    w["predicted_aqi_us"] = ml_hour_data.get("predicted_aqi_us", ml_hour_data["predicted_aqi"])
                     w["confidence"] = ml_hour_data["confidence"]
                     w["confidence_low"] = ml_hour_data["confidence_low"]
                     w["confidence_high"] = ml_hour_data["confidence_high"]
