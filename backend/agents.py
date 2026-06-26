@@ -351,53 +351,94 @@ class EnforcementAgent:
                 (w for w in wards if w["id"] == reading["ward_id"]), None
             )
 
-            # Find nearby emission sources
+            # Find nearby emission sources sorted by distance
             nearby: List[Dict[str, Any]] = []
             for src in sources:
                 dist = _haversine(
-                    reading["location"][0],
-                    reading["location"][1],
-                    src["location"][0],
-                    src["location"][1],
+                    reading["location"][0], reading["location"][1],
+                    src["location"][0], src["location"][1],
                 )
                 if dist < 5:
                     nearby.append({**src, "distance_km": round(dist, 2)})
+            nearby.sort(key=lambda x: x["distance_km"])
 
-            # Priority scoring: AQI weighted by proximity to sensitive zones
+            # Priority scoring with vulnerability multipliers
             priority_score = float(reading["aqi"])
+            vuln_flags: List[str] = []
             if ward:
                 vuln = ward.get("vulnerable", {})
                 if vuln.get("hospitals", 0) >= 3:
                     priority_score *= 1.3
+                    vuln_flags.append(f"🏥 {vuln['hospitals']} hospitals at risk")
                 if vuln.get("schools", 0) >= 5:
                     priority_score *= 1.15
+                    vuln_flags.append(f"🏫 {vuln['schools']} schools nearby")
                 if vuln.get("elderly_pct", 0) >= 15:
                     priority_score *= 1.2
+                    vuln_flags.append(f"👴 {vuln['elderly_pct']}% elderly population")
 
-            hotspots.append(
-                {
-                    "sensor_id": reading["sensor_id"],
-                    "ward_id": reading["ward_id"],
-                    "ward_name": ward["name"] if ward else "Unknown",
-                    "location": reading["location"],
-                    "aqi": reading["aqi"],
-                    "severity": severity,
-                    "priority_score": round(priority_score, 1),
-                    "nearby_sources": nearby,
-                    "recommended_actions": self._recommend(severity, nearby),
-                    "evidence": {
-                        "aqi_reading": reading["aqi"],
-                        "pollutants": reading["pollutants"],
-                        "timestamp": reading["timestamp"],
-                        "coordinates": reading["location"],
-                    },
-                }
-            )
+            # Dominant pollutant analysis
+            pollutants = reading.get("pollutants", {})
+            pm25 = pollutants.get("pm25", 0)
+            pm10 = pollutants.get("pm10", 0)
+            no2  = pollutants.get("no2", 0)
+            so2  = pollutants.get("so2", 0)
+            co   = pollutants.get("co", 0)
+
+            dominant_pollutant = "PM2.5" if pm25 >= pm10 else "PM10"
+            pollutant_exceedances: List[str] = []
+            if pm25 > 60:
+                pollutant_exceedances.append(f"PM2.5 {pm25:.1f} µg/m³ (safe: 60)")
+            if pm10 > 100:
+                pollutant_exceedances.append(f"PM10 {pm10:.1f} µg/m³ (safe: 100)")
+            if no2 > 40:
+                pollutant_exceedances.append(f"NO₂ {no2:.1f} µg/m³ (safe: 40)")
+            if so2 > 40:
+                pollutant_exceedances.append(f"SO₂ {so2:.1f} µg/m³ (safe: 40)")
+            if co > 2:
+                pollutant_exceedances.append(f"CO {co:.2f} mg/m³ (safe: 2)")
+
+            # Inferred source categories from pollutant signatures
+            inferred_sources: List[str] = []
+            if no2 > 40 or co > 1.0:
+                inferred_sources.append("Vehicular (elevated NO₂/CO)")
+            if so2 > 20 or (pm25 > 50 and so2 > 10):
+                inferred_sources.append("Industrial stacks (elevated SO₂)")
+            if pm25 > 0 and pm10 > 0 and (pm10 / max(pm25, 0.1)) > 1.8:
+                inferred_sources.append("Construction/road dust (PM10:PM2.5 ratio)")
+            if pm10 > 0 and pm25 > 0 and (pm25 / max(pm10, 0.1)) > 0.6 and pm25 > 60:
+                inferred_sources.append("Waste/crop burning (PM2.5:PM10 ratio)")
+
+            hotspots.append({
+                "sensor_id": reading["sensor_id"],
+                "ward_id": reading["ward_id"],
+                "ward_name": ward["name"] if ward else "Unknown",
+                "location": reading["location"],
+                "aqi": reading["aqi"],
+                "severity": severity,
+                "priority_score": round(priority_score, 1),
+                "dominant_pollutant": dominant_pollutant,
+                "pollutant_exceedances": pollutant_exceedances,
+                "inferred_sources": inferred_sources,
+                "vulnerability_flags": vuln_flags,
+                "nearby_sources": nearby,
+                "recommended_actions": self._recommend(severity, nearby),
+                "status": "pending",
+                "evidence": {
+                    "aqi_reading": reading["aqi"],
+                    "pollutants": pollutants,
+                    "timestamp": reading["timestamp"],
+                    "coordinates": reading["location"],
+                },
+            })
 
         hotspots.sort(key=lambda x: -x["priority_score"])
         return {
             "dispatches": hotspots,
             "total_hotspots": len(hotspots),
+            "severe_count": sum(1 for h in hotspots if h["severity"] == "severe"),
+            "very_poor_count": sum(1 for h in hotspots if h["severity"] == "very_poor"),
+            "poor_count": sum(1 for h in hotspots if h["severity"] == "poor"),
             "generated_at": datetime.now().isoformat(),
         }
 
@@ -406,19 +447,19 @@ class EnforcementAgent:
         actions: List[str] = []
         cats = {s["category"] for s in nearby}
         if "industrial" in cats:
-            actions.append("Inspect industrial emissions compliance")
+            actions.append("Inspect industrial stack emissions compliance & stack height logs")
         if "construction" in cats:
-            actions.append("Verify construction dust suppression measures")
+            actions.append("Verify dust suppression (water spraying, covered trucks, site barriers)")
         if "vehicular" in cats:
-            actions.append("Deploy traffic management and green corridor")
+            actions.append("Deploy traffic management & odd-even/green corridor restrictions")
         if "waste_burning" in cats:
-            actions.append("Investigate and halt open waste burning")
+            actions.append("Investigate & immediately halt open waste / crop burning")
         if not actions:
-            actions.append("Deploy mobile monitoring unit for source identification")
+            actions.append("Deploy mobile monitoring unit for on-ground source identification")
         if severity == "severe":
-            actions.insert(
-                0, "URGENT: Issue area evacuation advisory for sensitive groups"
-            )
+            actions.insert(0, "🚨 URGENT: Issue health advisory & consider school/office closures")
+        elif severity == "very_poor":
+            actions.insert(0, "⚠️ Issue public advisory for sensitive groups (elderly, children, respiratory patients)")
         return actions
 
 
