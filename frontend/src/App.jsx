@@ -1726,8 +1726,8 @@ function AttributionView({ state, attribution, loading, onClickLocation, mapStyl
 /* ── Enforcement View ──────────────────────────────────────────────────── */
 
 function EnforcementView({ dispatches, onRefresh, onViewEvidence }) {
-  const [statusMap, setStatusMap] = React.useState({})
-  const [filter, setFilter] = React.useState('all') // all | severe | very_poor | poor
+  const [statusMap, setStatusMap] = useState({})
+  const [filter, setFilter] = useState('all') // all | severe | very_poor | poor
 
   const SEVERITY_CONFIG = {
     severe:    { color: '#ef4444', bg: 'rgba(239,68,68,0.12)',    label: 'SEVERE',    icon: '🔴' },
@@ -2286,7 +2286,7 @@ function AnalyticsView({ state }) {
 /* ── Evidence Modal ────────────────────────────────────────────────────── */
 
 function EvidenceModal({ data, onClose }) {
-  const [dispatched, setDispatched] = React.useState(false)
+  const [dispatched, setDispatched] = useState(false)
 
   const POLLUTANT_LIMITS = { pm25: 60, pm10: 100, no2: 40, so2: 40, co: 2, o3: 100 }
   const POLLUTANT_UNITS  = { pm25: 'µg/m³', pm10: 'µg/m³', no2: 'µg/m³', so2: 'µg/m³', co: 'mg/m³', o3: 'µg/m³' }
