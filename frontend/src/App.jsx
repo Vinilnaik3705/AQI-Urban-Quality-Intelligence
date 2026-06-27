@@ -20,6 +20,14 @@ import {
 } from 'chart.js'
 import { Doughnut, Line, Bar } from 'react-chartjs-2'
 import 'leaflet/dist/leaflet.css'
+import {
+  LayoutDashboard, TrendingUp, Search, AlertTriangle, Users, BarChart2,
+  Wind, Thermometer, Bell, Activity, MapPin, Zap, Shield, Factory,
+  Car, Hammer, Flame, Leaf, RefreshCw, Eye, FileText, Navigation,
+  ChevronRight, Clock, Gauge, AlertCircle, CheckCircle, XCircle,
+  Satellite, Building2, GraduationCap, Heart, ArrowUpRight,
+  Volume2, VolumeX, ExternalLink, Info, Radio
+} from 'lucide-react'
 
 ChartJS.register(
   ArcElement, CategoryScale, LinearScale, PointElement,
@@ -99,45 +107,11 @@ function createAqiIcon(aqi, isWard = false) {
 }
 
 const ICONS = {
-  command: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-      <polyline points="9 22 9 12 15 12 15 22" />
-    </svg>
-  ),
-  forecast: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="18" y1="20" x2="18" y2="10" />
-      <line x1="12" y1="20" x2="12" y2="4" />
-      <line x1="6" y1="20" x2="6" y2="14" />
-    </svg>
-  ),
-  attribution: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="8" />
-      <line x1="21" y1="21" x2="16.65" y2="16.65" />
-    </svg>
-  ),
-  enforcement: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-      <line x1="12" y1="9" x2="12" y2="13" />
-      <line x1="12" y1="17" x2="12.01" y2="17" />
-    </svg>
-  ),
-  citizens: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
-  ),
-  analytics: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-    </svg>
-  )
+  command:     <LayoutDashboard size={18} />,
+  forecast:    <TrendingUp size={18} />,
+  attribution: <Search size={18} />,
+  enforcement: <Shield size={18} />,
+  analytics:   <BarChart2 size={18} />,
 };
 
 const TABS = [
@@ -471,38 +445,33 @@ function HeaderSearch({ onSelectPlace }) {
   }
 
   return (
-    <div className="header-search-container" ref={dropdownRef} style={{ position: 'relative', minWidth: '220px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+    <div className="header-search-container" ref={dropdownRef} style={{ position: 'relative' }}>
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+        <Search size={13} color="#4a6080" style={{ position: 'absolute', left: '10px', pointerEvents: 'none' }} />
         <input
           type="text"
-          className="select-field"
-          style={{ width: '220px', height: '32px', padding: '4px 8px', fontSize: '13px', margin: 0, borderRadius: '4px', border: '1px solid #2e384e', background: '#0f172a', color: '#f1f5f9' }}
+          className="header-search-input"
           placeholder="Search city or village..."
           value={query}
           onFocus={() => { if (results.length) setShowDropdown(true) }}
           onChange={e => handleSearch(e.target.value)}
         />
-        <span style={{ fontSize: '14px', cursor: 'default' }}>🔍</span>
       </div>
       {showDropdown && results.length > 0 && (
-        <div 
-          className="map-search-results" 
+        <div
+          className="map-search-results"
           onMouseDown={e => e.stopPropagation()}
           onClick={e => e.stopPropagation()}
-          style={{ position: 'absolute', top: '38px', left: 0, width: '100%', zIndex: 9999, background: '#1e293b', border: '1px solid #334155', borderRadius: '4px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}
+          style={{ position: 'absolute', top: '38px', left: 0, width: '100%', zIndex: 9999 }}
         >
           {results.map((r, i) => (
-            <div 
-              key={i} 
-              className="map-search-result-row" 
-              style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #334155', display: 'flex', alignItems: 'center' }} 
-              onClick={(e) => {
-                e.stopPropagation();
-                selectItem(r);
-              }}
+            <div
+              key={i}
+              className="map-search-result-row"
+              onClick={(e) => { e.stopPropagation(); selectItem(r); }}
             >
-              <span style={{ marginRight: '6px' }}>📍</span>
-              <span style={{ fontSize: '12px', color: '#f1f5f9' }}>
+              <MapPin size={11} color="#4a6080" />
+              <span>
                 <strong>{r.name}</strong>
                 {r.admin1 && `, ${r.admin1}`}
                 {r.country && ` (${r.country})`}
@@ -522,35 +491,44 @@ function Header({ tab, cityAqi, alertCount, weather, onSelectPlace }) {
   return (
     <header className="header">
       <div className="header-title">
-        <span className="icon">{currentTab?.icon}</span>
+        <span className="icon" style={{ color: '#38bdf8' }}>{currentTab?.icon}</span>
         {currentTab?.label}
       </div>
       <div className="header-stats">
         <div className="header-stat" style={{ marginRight: '16px' }}>
           <HeaderSearch onSelectPlace={onSelectPlace} />
         </div>
-        <div className="header-stat" style={{ display: 'flex', alignItems: 'center', gap: '6px', marginRight: '8px' }}>
-          <span style={{ fontSize: '14px' }}>🇮🇳</span>
-          <span style={{ fontSize: '12px', fontWeight: '600', color: '#f1f5f9', padding: '2px 8px', border: '1px solid #2e384e', borderRadius: '4px', height: '32px', display: 'flex', alignItems: 'center' }}>AQI-IN</span>
+        <div className="header-stat" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <span style={{ fontSize: '13px' }}>🇮🇳</span>
+          <span style={{ fontSize: '11px', fontWeight: '700', color: '#38bdf8', padding: '2px 7px', border: '1px solid rgba(56,189,248,0.3)', borderRadius: '4px', background: 'rgba(56,189,248,0.08)' }}>AQI-IN</span>
         </div>
         <div className="header-stat">
-          <div className="status-dot live" />
-          <span>Live</span>
+          <span style={{ display: 'inline-block', width: '7px', height: '7px', borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 6px #22c55e', animation: 'pulse 2s infinite' }} />
+          <span style={{ fontSize: '12px', color: '#22c55e', fontWeight: '600' }}>Live</span>
         </div>
-        <div className="header-stat">
-          Global AQI Avg: <span className="value" style={{ color: aqiColor(cityAqi) }}>{cityAqi}</span>
+        <div className="header-stat" style={{ gap: '5px' }}>
+          <Gauge size={13} color="#94a3b8" />
+          <span style={{ fontSize: '12px', color: '#94a3b8' }}>Avg:</span>
+          <span className="value" style={{ color: aqiColor(cityAqi), fontWeight: '700' }}>{cityAqi}</span>
         </div>
-        <div className="header-stat">
-          Alerts: <span className="value" style={{ color: alertCount > 0 ? '#ef4444' : '#22c55e' }}>{alertCount}</span>
+        <div className="header-stat" style={{ gap: '5px' }}>
+          <Bell size={13} color={alertCount > 0 ? '#ef4444' : '#475569'} />
+          <span className="value" style={{ color: alertCount > 0 ? '#ef4444' : '#64748b', fontWeight: '700' }}>{alertCount}</span>
         </div>
         {weather && (
           <>
-            <div className="header-stat">
-              🌡 <span className="value">{weather.temperature_c !== null ? `${weather.temperature_c}°C` : 'N/A'}</span>
-            </div>
-            <div className="header-stat">
-              💨 <span className="value">{weather.wind_speed_kmh !== null ? `${weather.wind_speed_kmh} km/h` : 'N/A'}</span>
-            </div>
+            {weather.temperature_c !== null && (
+              <div className="header-stat" style={{ gap: '4px' }}>
+                <Thermometer size={13} color="#94a3b8" />
+                <span className="value">{weather.temperature_c}°C</span>
+              </div>
+            )}
+            {weather.wind_speed_kmh !== null && (
+              <div className="header-stat" style={{ gap: '4px' }}>
+                <Wind size={13} color="#94a3b8" />
+                <span className="value">{weather.wind_speed_kmh} km/h</span>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -617,9 +595,6 @@ function MapLayersControl() {
 function EmissionSourcePopup({ src }) {
   const [address, setAddress] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [cctvLoading, setCctvLoading] = useState(false);
-  const [cctvVerified, setCctvVerified] = useState(false);
-  const [dispatched, setDispatched] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -630,9 +605,7 @@ function EmissionSourcePopup({ src }) {
         const res = await fetch(`/api/reverse-geocode?lat=${lat}&lng=${lng}`);
         if (res.ok) {
           const data = await res.json();
-          if (active && data.address) {
-            setAddress(data.address);
-          }
+          if (active && data.address) setAddress(data.address);
         }
       } catch (e) {
         console.error("Reverse geocoding failed", e);
@@ -644,115 +617,47 @@ function EmissionSourcePopup({ src }) {
     return () => { active = false; };
   }, [src.location]);
 
-  const handleCctvRequest = () => {
-    setCctvLoading(true);
-    setTimeout(() => {
-      setCctvLoading(false);
-      setCctvVerified(true);
-    }, 1200);
-  };
-
-  const handleDispatch = () => {
-    setDispatched(true);
-  };
-
   const road = address?.road || address?.suburb || address?.neighbourhood || '';
   const area = address?.county || address?.city_district || address?.city || address?.state_district || '';
   const stateName = address?.state || '';
-  const postcode = address?.postcode || '';
   const [lat, lng] = src.location;
 
+  const SOURCE_ICON = { industrial: '🏭', vehicular: '🚗', construction: '🏗️', waste_burning: '🔥' };
+
   return (
-    <div style={{ minWidth: '240px', padding: '4px', fontFamily: 'inherit' }}>
-      <strong>📍 {src.name.replace("Satellite Fire Anomaly (MODIS/VIIRS)", "Active Waste Burning Site")}</strong><br />
-      <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'capitalize', display: 'block', marginBottom: '6px' }}>
-        Category: {src.category.replace('_', ' ')}
+    <div style={{ minWidth: '220px', padding: '4px', fontFamily: 'inherit' }}>
+      <div style={{ fontWeight: '700', color: '#f1f5f9', marginBottom: '3px' }}>
+        {SOURCE_ICON[src.category] || '�'} {src.name.replace("Satellite Fire Anomaly (MODIS/VIIRS)", "Active Waste Burning Site")}
+      </div>
+      <span style={{ fontSize: '11px', color: '#64748b', textTransform: 'capitalize', display: 'block', marginBottom: '8px' }}>
+        {src.category.replace('_', ' ')}
       </span>
 
       {loading ? (
-        <span style={{ fontSize: '12px', color: '#64748b' }}>🔍 Locating street address...</span>
+        <span style={{ fontSize: '11px', color: '#64748b' }}>Locating address…</span>
       ) : address ? (
-        <div style={{ fontSize: '12px', color: '#f1f5f9', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '6px', marginTop: '4px', marginBottom: '12px' }}>
-          {road && <div style={{ marginBottom: '2px' }}><strong>🛣️ Street:</strong> {road}</div>}
-          {area && <div style={{ marginBottom: '2px' }}><strong>🏙️ Area:</strong> {area}</div>}
-          {stateName && <div style={{ marginBottom: '2px' }}><strong>📍 State:</strong> {stateName} {postcode}</div>}
-          <div style={{ fontSize: '10px', color: '#64748b', marginTop: '4px' }}>
-            Coordinates: {lat.toFixed(4)}, {lng.toFixed(4)}
+        <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '8px' }}>
+          {road && <div>{road}</div>}
+          {area && <div>{area}</div>}
+          {stateName && <div>{stateName}</div>}
+          <div style={{ fontSize: '10px', color: '#475569', marginTop: '3px', fontFamily: 'monospace' }}>
+            {lat.toFixed(4)}, {lng.toFixed(4)}
           </div>
         </div>
       ) : (
-        <div style={{ fontSize: '11px', color: '#ef4444', marginBottom: '12px' }}>Address lookup unavailable</div>
+        <div style={{ fontSize: '11px', color: '#475569', marginBottom: '8px', fontFamily: 'monospace' }}>
+          {lat.toFixed(4)}, {lng.toFixed(4)}
+        </div>
       )}
 
-      {/* Verification Panel */}
-      <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <div style={{ fontSize: '11px', fontWeight: '700', color: '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-          🛡️ Active Status Verification
-        </div>
-
-        {cctvLoading && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#38bdf8', padding: '6px 0' }}>
-            <div style={{ 
-              width: '12px', 
-              height: '12px', 
-              border: '2px solid rgba(56, 189, 248, 0.3)', 
-              borderTopColor: '#38bdf8', 
-              borderRadius: '50%',
-              animation: 'spin 0.8s linear infinite'
-            }} />
-            <span>Pinging nearby CCTV camera node...</span>
-          </div>
-        )}
-
-        {cctvVerified && !cctvLoading && (
-          <div style={{ border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '6px', background: 'rgba(239, 68, 68, 0.05)', overflow: 'hidden', marginBottom: '4px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', background: 'rgba(239, 68, 68, 0.15)', fontSize: '11px', color: '#f87171', fontWeight: '700' }}>
-              <span>● LIVE CCTV FEED</span>
-              <span>CONFIRMED</span>
-            </div>
-            <div style={{ width: '100%', height: '120px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#0f172a', color: '#94a3b8', fontSize: '11px', gap: '8px' }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#ef4444' }}>
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                <circle cx="12" cy="13" r="4"/>
-              </svg>
-              <span style={{ fontWeight: '500', letterSpacing: '0.05em' }}>[ CCTV FEED ACTIVE ]</span>
-            </div>
-          </div>
-        )}
-
-        {!cctvVerified && !cctvLoading && (
-          <button 
-            onClick={handleCctvRequest}
-            style={{ width: '100%', padding: '6px 10px', background: '#1e293b', border: '1px solid #334155', borderRadius: '4px', color: '#f1f5f9', fontSize: '11px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-          >
-            📷 Query Local CCTV Node
-          </button>
-        )}
-
-        <a 
-          href={`https://firms.modaps.eosdis.nasa.gov/map/#d:24hrs;@${lat},${lng},14z`} 
-          target="_blank" 
-          rel="noopener noreferrer"
-          style={{ width: '100%', padding: '6px 10px', background: '#0f172a', border: '1px solid #1e293b', borderRadius: '4px', color: '#38bdf8', fontSize: '11px', fontWeight: '600', textDecoration: 'none', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-        >
-          🛰️ Cross-Check NASA FIRMS Map
-        </a>
-
-        {cctvVerified && (
-          dispatched ? (
-            <div style={{ width: '100%', padding: '6px 10px', background: 'rgba(34, 197, 94, 0.15)', border: '1px solid rgba(34, 197, 94, 0.3)', borderRadius: '4px', color: '#4ade80', fontSize: '11px', fontWeight: '700', textAlign: 'center' }}>
-              🚔 Enforcement Dispatched Successfully
-            </div>
-          ) : (
-            <button 
-              onClick={handleDispatch}
-              style={{ width: '100%', padding: '6px 10px', background: '#ef4444', border: 'none', borderRadius: '4px', color: '#ffffff', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-            >
-              🚔 Dispatch Local Inspector
-            </button>
-          )
-        )}
-      </div>
+      <a
+        href={`https://firms.modaps.eosdis.nasa.gov/map/#d:24hrs;@${lat},${lng},14z`}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#38bdf8', textDecoration: 'none', fontWeight: '600' }}
+      >
+        🛰️ View on NASA FIRMS
+      </a>
     </div>
   );
 }
@@ -1750,12 +1655,12 @@ function EnforcementView({ dispatches, onRefresh, onViewEvidence }) {
       {/* Header */}
       <div className="panel-header">
         <div>
-          <div className="panel-title">🚨 Enforcement Intelligence Console</div>
+          <div className="panel-title"><Shield size={20} color="#ef4444" /> Enforcement Intelligence Console</div>
           <div className="panel-subtitle">
             AI-prioritised inspector dispatch recommendations with evidence packages
           </div>
         </div>
-        <button className="btn btn-primary" onClick={onRefresh}>↻ Re-scan Hotspots</button>
+        <button className="btn btn-primary" onClick={onRefresh}><RefreshCw size={13} /> Re-scan Hotspots</button>
       </div>
 
       {/* Summary stats bar */}
@@ -2678,7 +2583,7 @@ function AnalyticsView({ state }) {
     <div className="panel-full">
       <div className="panel-header">
         <div>
-          <div className="panel-title">📈 Analytics & Reporting</div>
+          <div className="panel-title"><TrendingUp size={20} color="#3b82f6" /> Analytics &amp; Reporting</div>
           <div className="panel-subtitle">
             Real-time AQI comparison, emission source distribution, and city vulnerability profiles
           </div>
