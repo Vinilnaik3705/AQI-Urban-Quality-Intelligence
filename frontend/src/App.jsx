@@ -2051,6 +2051,7 @@ function CitizensAdvisoryPopup({ state, advisory, lang, onChangeLang, selectedWa
   const [nearbyPlaces, setNearbyPlaces] = useState(null)
   const [nearbyLoading, setNearbyLoading] = useState(false)
   const [voices, setVoices] = useState([])
+  const audioRef = useRef(null)
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.speechSynthesis) return
@@ -2067,6 +2068,10 @@ function CitizensAdvisoryPopup({ state, advisory, lang, onChangeLang, selectedWa
   useEffect(() => {
     return () => {
       window.speechSynthesis.cancel()
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
+      }
     }
   }, [isOpen])
 
@@ -2103,6 +2108,10 @@ function CitizensAdvisoryPopup({ state, advisory, lang, onChangeLang, selectedWa
     if (!advisory) return
     
     if (isSpeaking) {
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
+      }
       window.speechSynthesis.cancel()
       setIsSpeaking(false)
       return
@@ -2120,30 +2129,49 @@ function CitizensAdvisoryPopup({ state, advisory, lang, onChangeLang, selectedWa
       translatedPrecautions
     )
 
-    const utterance = new SpeechSynthesisUtterance(textToRead)
-    
     let langCode = 'en-IN'
     if (lang === 'hi') langCode = 'hi-IN'
     else if (lang === 'kn') langCode = 'kn-IN'
     else if (lang === 'ta') langCode = 'ta-IN'
     else if (lang === 'te') langCode = 'te-IN'
-    
-    utterance.lang = langCode
 
-    // Explicitly locate voice matching language tag from loaded voices state
+    // Look for local voice matching chosen language
     const match = voices.find(v => v.lang.toLowerCase().replace('_', '-').startsWith(langCode.substring(0, 2).toLowerCase()))
-    if (match) {
-      utterance.voice = match
-      console.log(`Matched voice: ${match.name} (${match.lang}) for language: ${langCode}`)
+    
+    if (lang !== 'en' && !match) {
+      // Fallback: Google Translate TTS cloud audio stream
+      console.log(`No native voice found for ${langCode} locally. Falling back to Google Translate cloud TTS.`)
+      const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${langCode}&client=tw-ob&q=${encodeURIComponent(textToRead)}`
+      
+      const audio = new Audio(url)
+      audioRef.current = audio
+      audio.onended = () => setIsSpeaking(false)
+      audio.onerror = () => setIsSpeaking(false)
+      
+      setIsSpeaking(true)
+      audio.play().catch(err => {
+        console.error("Cloud Audio playback failed, falling back to local synthesis:", err)
+        // Fall back to synthesis anyway
+        const utterance = new SpeechSynthesisUtterance(textToRead)
+        utterance.lang = langCode
+        utterance.onend = () => setIsSpeaking(false)
+        utterance.onerror = () => setIsSpeaking(false)
+        window.speechSynthesis.speak(utterance)
+      })
     } else {
-      console.warn(`No native voice found for ${langCode}. Browser will auto-fall back using lang property.`)
+      // Standard SpeechSynthesis
+      const utterance = new SpeechSynthesisUtterance(textToRead)
+      utterance.lang = langCode
+      if (match) {
+        utterance.voice = match
+        console.log(`Using native voice: ${match.name}`)
+      }
+      utterance.onend = () => setIsSpeaking(false)
+      utterance.onerror = () => setIsSpeaking(false)
+
+      setIsSpeaking(true)
+      window.speechSynthesis.speak(utterance)
     }
-
-    utterance.onend = () => setIsSpeaking(false)
-    utterance.onerror = () => setIsSpeaking(false)
-
-    setIsSpeaking(true)
-    window.speechSynthesis.speak(utterance)
   }
 
   return (
