@@ -1124,47 +1124,6 @@ function CommandCenter({ state, selectedWard, onSelectWard, mapStyle, setMapStyl
       </div>
     </div>
   );
-} })}
-                </div>
-              )
-            })()}
-
-            {/* Bottom Scale Legend */}
-            <div style={{ marginTop: '24px', borderTop: '1px solid #2e384e', paddingTop: '16px' }}>
-              <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '8px', textAlign: 'center' }}>
-                AQI Scale Legend
-              </div>
-              <div style={{ display: 'flex', width: '100%', height: '8px', borderRadius: '4px', overflow: 'hidden' }}>
-                <div style={{ flex: 1, background: '#22c55e' }} title="Good (0-50)" />
-                <div style={{ flex: 1, background: '#84cc16' }} title="Satisfactory (51-100)" />
-                <div style={{ flex: 2, background: '#eab308' }} title="Moderate (101-200)" />
-                <div style={{ flex: 2, background: '#f97316' }} title="Poor (201-300)" />
-                <div style={{ flex: 2, background: '#ef4444' }} title="Very Poor (301-400)" />
-                <div style={{ flex: 2, background: '#991b1b' }} title="Severe (401-500+)" />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: '#64748b', marginTop: '4px' }}>
-                <span>0</span>
-                <span>50</span>
-                <span>100</span>
-                <span>200</span>
-                <span>300</span>
-                <span>400</span>
-                <span>500+</span>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="card" style={{ padding: '30px', background: '#1c2230', borderRadius: '12px', border: '1px solid #2e384e', color: '#94a3b8', textAlign: 'center', minHeight: '400px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '16px' }}>
-            <span style={{ fontSize: '48px' }}>🌍</span>
-            <strong style={{ color: '#f1f5f9', fontSize: '16px' }}>Global Air Quality Monitor</strong>
-            <p style={{ fontSize: '13px', lineHeight: '1.6', margin: 0 }}>
-              Search for any city or village in the header search bar or select a marker bubble on the map to view real-time pollutants breakdown.
-            </p>
-          </div>
-        )}
-      </div>
-    </div>
-  )
 }
 
 /* ── Forecast View ─────────────────────────────────────────────────────── */
