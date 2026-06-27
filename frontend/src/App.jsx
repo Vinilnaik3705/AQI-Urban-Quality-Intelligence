@@ -843,7 +843,7 @@ function CommandCenter({ state, selectedWard, onSelectWard, mapStyle, setMapStyl
 
   return (
     <div className="content-area" style={{ display: 'flex', flexDirection: 'row', gap: '24px', flex: 1 }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', flex: 1 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', flex: 1, minWidth: 0 }}>
       <div className="iqair-layout-grid" style={{ minHeight: '520px' }}>
         {/* Left Column (Maximized Map) */}
         <div className="iqair-right-panel" style={{ flex: 1 }}>
@@ -994,7 +994,7 @@ function CommandCenter({ state, selectedWard, onSelectWard, mapStyle, setMapStyl
             <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', marginBottom: '12px' }}>
               Projections for the next 72 hours based on localized atmospheric modeling.
             </div>
-            <div className="detailed-hourly-scroll">
+            <div className="detailed-hourly-scroll" style={{ width: '100%', maxWidth: '100%', overflowX: 'auto' }}>
               {hourlyForecastData.map((item, idx) => (
                 <div key={idx} className="hourly-card">
                   <span className="hourly-time">{item.time}</span>
