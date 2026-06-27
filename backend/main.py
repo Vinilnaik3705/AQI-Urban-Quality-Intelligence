@@ -439,6 +439,7 @@ async def run_advisory(
     ward_id: str = Query(...),
     lang: str = Query(default="en"),
     city: str = Query(default=DEFAULT_CITY),
+    profile: str = Query(default="healthy_adult"),
 ):
     """Run the Citizen Advisory Agent for a specific ward and language."""
     # First, handle custom coordinates in ward_id
@@ -488,7 +489,8 @@ async def run_advisory(
             ward, avg_aqi, lang,
             pollutants=avg_pollutants,
             weather=weather,
-            sources=sources
+            sources=sources,
+            profile=profile
         )
 
     # Standard city ward
@@ -531,8 +533,31 @@ async def run_advisory(
         ward, avg_aqi, lang, 
         pollutants=avg_pollutants, 
         weather=weather, 
-        sources=sources
+        sources=sources,
+        profile=profile
     )
+
+
+ACTIVE_SUBSCRIPTIONS = {}
+
+@app.post("/api/advisory/subscribe")
+async def subscribe_advisory(
+    ward_id: str = Query(...),
+    profile: str = Query(default="healthy_adult"),
+    channel: str = Query(default="none"),
+    lang: str = Query(default="en"),
+):
+    """Register a public health advisory alert subscription."""
+    sub_key = f"{ward_id}_{profile}"
+    ACTIVE_SUBSCRIPTIONS[sub_key] = {
+        "ward_id": ward_id,
+        "profile": profile,
+        "channel": channel,
+        "lang": lang,
+        "subscribed_at": datetime.now(timezone.utc).isoformat()
+    }
+    print(f"Registered subscription: {ACTIVE_SUBSCRIPTIONS[sub_key]}")
+    return {"status": "success", "message": f"Successfully subscribed to {channel} alerts."}
 
 
 @app.get("/api/alerts")

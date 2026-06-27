@@ -174,6 +174,7 @@ export default function App() {
   // Advisory state
   const [advisory, setAdvisory] = useState(null)
   const [advLang, setAdvLang] = useState('en')
+  const [advProfile, setAdvProfile] = useState('healthy_adult')
   const [isAdvisoryOpen, setIsAdvisoryOpen] = useState(false)
 
   // ── Data Fetching ────────────────────────────────────────────────────
@@ -227,14 +228,14 @@ export default function App() {
     if (tab === 'enforcement') loadDispatches()
   }, [tab, loadDispatches])
 
-  const loadAdvisory = useCallback(async (wardId, lang) => {
-    const data = await fetchJSON(`/api/agents/advisory?city=all&ward_id=${wardId}&lang=${lang}`, { method: 'POST' })
+  const loadAdvisory = useCallback(async (wardId, lang, profile = 'healthy_adult') => {
+    const data = await fetchJSON(`/api/agents/advisory?city=all&ward_id=${wardId}&lang=${lang}&profile=${profile}`, { method: 'POST' })
     if (data) setAdvisory(data)
   }, [])
 
   useEffect(() => {
-    if (isAdvisoryOpen && selectedWard) loadAdvisory(selectedWard.id, advLang)
-  }, [isAdvisoryOpen, selectedWard, advLang, loadAdvisory])
+    if (isAdvisoryOpen && selectedWard) loadAdvisory(selectedWard.id, advLang, advProfile)
+  }, [isAdvisoryOpen, selectedWard, advLang, advProfile, loadAdvisory])
 
   const handleSelectPlace = async (place) => {
     const data = await fetchJSON(`/api/aqi-details?lat=${place.lat}&lng=${place.lng}&name=${encodeURIComponent(place.name)}&country=${encodeURIComponent(place.country)}&state=${encodeURIComponent(place.state)}`)
@@ -368,10 +369,13 @@ export default function App() {
         advisory={advisory}
         lang={advLang}
         onChangeLang={setAdvLang}
+        profile={advProfile}
+        onChangeProfile={setAdvProfile}
         selectedWard={selectedWard}
-        onSelectWard={(w) => { handleSelectWard(w); loadAdvisory(w.id, advLang) }}
+        onSelectWard={(w) => { handleSelectWard(w); loadAdvisory(w.id, advLang, advProfile) }}
         isOpen={isAdvisoryOpen}
         onToggle={() => setIsAdvisoryOpen(!isAdvisoryOpen)}
+        onLoadAdvisory={loadAdvisory}
       />
 
       {/* ── Evidence Modal ───────────────────────────────────────────── */}
@@ -2831,83 +2835,32 @@ function getPrecautionEmoji(precautionText) {
   return '⚠️';
 }
 
-function CitizensAdvisoryPopup({ state, advisory, lang, onChangeLang, selectedWard, onSelectWard, isOpen, onToggle }) {
-  const [isSpeaking, setIsSpeaking] = useState(false)
-  const [nearbyPlaces, setNearbyPlaces] = useState(null)
-  const [nearbyLoading, setNearbyLoading] = useState(false)
-  const [voices, setVoices] = useState([])
-  const audioRef = useRef(null)
-
-  const [personalProfile, setPersonalProfile] = useState('healthy_adult')
+function CitizensAdvisoryPopup({ 
+  state, 
+  advisory, 
+  lang, 
+  onChangeLang, 
+  profile, 
+  onChangeProfile, 
+  selectedWard, 
+  onSelectWard, 
+  isOpen, 
+  onToggle, 
+  onLoadAdvisory 
+}) {
+  const [personalProfile, setPersonalProfile] = useState(profile || 'healthy_adult')
   const [alertChannel, setAlertChannel] = useState('none')
   const [phoneNumber, setPhoneNumber] = useState('')
   const [subscriptionActive, setSubscriptionActive] = useState(false)
-
-  const getPersonalizedPrefix = () => {
-    if (!subscriptionActive) return '';
-    const prefixes = {
-      en: {
-        healthy_adult: "[Personal Profile: Healthy Adult] - Standard advisory active. Maintain regular health checks.",
-        sensitive: "[Personal Profile: Child / Sensitive] - ⚠️ Children should avoid early morning or late evening outdoor play.",
-        elderly: "[Personal Profile: Elderly (60+)] - ⚠️ Seniors are advised to remain indoors and avoid taxing physical tasks.",
-        outdoor_worker: "[Personal Profile: Outdoor Worker] - 😷 Mandatory N95 respirator mask during work shifts. Take breaks in filtered indoor zones.",
-        asthma: "[Personal Profile: Respiratory/Asthma] - 🩺 Keep relief inhalers handy. Ensure air purifier is running on high speed."
-      },
-      hi: {
-        healthy_adult: "[व्यक्तिगत प्रोफ़ाइल: स्वस्थ वयस्क] - सामान्य सलाह सक्रिय। नियमित स्वास्थ्य जांच जारी रखें।",
-        sensitive: "[व्यक्तिगत प्रोफ़ाइल: बच्चे / संवेदनशील] - ⚠️ बच्चों को सुबह या देर शाम बाहर खेलने से बचना चाहिए।",
-        elderly: "[व्यक्तिगत प्रोफ़ाइल: बुजुर्ग (60+)] - ⚠️ वरिष्ठ नागरिकों को घर के अंदर रहने और भारी शारीरिक कार्यों से बचने की सलाह दी जाती है।",
-        outdoor_worker: "[व्यक्तिगत प्रोफ़ाइल: आउटडोर कार्यकर्ता] - 😷 काम के दौरान N95 मास्क पहनना अनिवार्य है। फिल्टर वाले कमरों में आराम करें।",
-        asthma: "[व्यक्तिगत प्रोफ़ाइल: श्वसन/अस्थमा] - 🩺 इनहेलर अपने पास रखें। एयर प्यूरीफायर को तेज गति पर चलाएं।"
-      },
-      kn: {
-        healthy_adult: "[ವೈಯಕ್ತಿಕ ಪ್ರೊಫೈಲ್: ಆರೋಗ್ಯವಂತ ವಯಸ್ಕ] - ಸಾಮಾನ್ಯ ಆರೋಗ್ಯ ಸಲಹೆ ಸಕ್ರಿಯವಾಗಿದೆ.",
-        sensitive: "[ವೈಯಕ್ತಿಕ ಪ್ರೊಫೈಲ್: ಮಕ್ಕಳು / ಸೂಕ್ಷ್ಮ ಗುಂಪು] - ⚠️ ಮಕ್ಕಳು ಬೆಳಿಗ್ಗೆ ಅಥವಾ ಸಂಜೆ ಹೊರಗೆ ಆಟವಾಡುವುದನ್ನು ತಪ್ಪಿಸಬೇಕು.",
-        elderly: "[ವೈಯಕ್ತಿಕ ಪ್ರೊಫೈಲ್: ಹಿರಿಯ ನಾಗರಿಕರು (60+)] - ⚠️ ಹಿರಿಯರು ಮನೆಯೊಳಗೆ ಇರಲು ಮತ್ತು ಕಠಿಣ ಶ್ರಮದ ಕೆಲಸಗಳನ್ನು ಮಾಡದಂತೆ ಸೂಚಿಸಲಾಗಿದೆ.",
-        outdoor_worker: "[ವೈಯಕ್ತಿಕ ಪ್ರೊಫೈಲ್: ಹೊರಾಂಗಣ ಕಾರ್ಮಿಕರು] - 😷 ಕೆಲಸದ ಅವಧಿಯಲ್ಲಿ N95 ಮಾಸ್ಕ್ ಕಡ್ಡಾಯವಾಗಿ ಧರಿಸಿ. ಸ್ವಚ್ಛ ಗಾಳಿಯ ಕೊಠಡಿಯಲ್ಲಿ ವಿಶ್ರಾಂತಿ ಪಡೆಯಿರಿ.",
-        asthma: "[ವೈಯಕ್ತಿಕ ಪ್ರೊಫೈಲ್: ಶ್ವಾಸಕೋಶದ ತೊಂದರೆ/ಅಸ್ತಮಾ] - 🩺 ನಿಮ್ಮ ಇನ್ಹೇಲರ್ಗಳನ್ನು ಹತ್ತಿರ ಇಟ್ಟುಕೊಳ್ಳಿ. ಏರ್ ಪ್ಯೂರಿಫೈಯರ್ ಆನ್ ಮಾಡಿ."
-      },
-      ta: {
-        healthy_adult: "[தனிநபர் சுயவிவரம்: ஆரோக்கியமான முதியவர்] - நிலையான ஆலோசனை செயலில் உள்ளது.",
-        sensitive: "[தனிநபர் சுயவிவரம்: குழந்தைகள் / உணர்திறன்] - ⚠️ குழந்தைகள் அதிகாலை அல்லது மாலை நேரங்களில் வெளியே விளையாடுவதைத் தவிர்க்க வேண்டும்.",
-        elderly: "[தனிநபர் சுயவிவரம்: முதியவர்கள் (60+)] - ⚠️ முதியவர்கள் வீட்டிற்குள் இருக்கவும், கடினமான உடலுழைப்பைத் தவிர்க்கவும் அறிவுறுத்தப்படுகிறார்கள்.",
-        outdoor_worker: "[தனிநபர் சுயவிவரம்: வெளிப்புற பணியாளர்கள்] - 😷 பணியின் போது N95 முகமூடி அணிவது கட்டாயமாகும். காற்று சுத்திகரிக்கப்பட்ட இடங்களில் ஓய்வெடுக்கவும்.",
-        asthma: "[தனிநபர் சுயவிவரம்: சுவாசம்/ஆஸ்துமா] - 🩺 இன்ஹேலர்களை எப்போதும் கையில் வைத்திருக்கவும். ஏர் பியூரிஃபையரை இயக்கவும்."
-      },
-      te: {
-        healthy_adult: "[వ్యక్తిగత ప్రొఫైల్: ఆరోగ్యకరమైన వయోజన] - సాధారణ సలహా సక్రియంగా ఉంది.",
-        sensitive: "[వ్యಕ್ತಿగత ప్రొఫైల్: పిల్లలు / సున్నితమైన సమూహం] - ⚠️ పిల్లలు ఉదయం లేదా సాయంత్రం వేళల్లో బయట ఆడుకోకూడదు.",
-        elderly: "[వ్యಕ್ತಿగత ప్రొఫైల్: వృద్ధులు (60+)] - ⚠️ వృద్ధులు ఇంట్లోనే ఉండాలని మరియు శారీరక శ్రమను నివారించాలని సూచించబడింది.",
-        outdoor_worker: "[వ్యಕ್ತಿగత ప్రొఫైల్: అవుట్డోర్ వర్కర్స్] - 😷 పని వేళల్లో N95 మాస్క్ తప్పనిసరిగాధరించాలి. ఫిల్టర్ చేయబడిన గదుల్లో విశ్రాంతి తీసుకోండి.",
-        asthma: "[వ్యక్తిగత ప్రొఫైల్: శ్వాసకోశ/ఆస్తమా] - 🩺 ఇన్హేలర్లను అందుబాటులో ఉంచుకోండి. ఎయిర్ ప్యూరిఫైయర్ ఆన్ చేసి ఉంచండి."
-      }
-    };
-    const langKey = lang || 'en';
-    const profileKey = personalProfile || 'healthy_adult';
-    return (prefixes[langKey] || prefixes['en'])[profileKey] + " ";
-  };
+  const [subscribing, setSubscribing] = useState(false)
+  const [nearbyPlaces, setNearbyPlaces] = useState(null)
+  const [nearbyLoading, setNearbyLoading] = useState(false)
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) return
-    const updateVoices = () => {
-      setVoices(window.speechSynthesis.getVoices())
+    if (profile) {
+      setPersonalProfile(profile);
     }
-    updateVoices()
-    window.speechSynthesis.onvoiceschanged = updateVoices
-    return () => {
-      window.speechSynthesis.onvoiceschanged = null
-    }
-  }, [])
-
-  useEffect(() => {
-    return () => {
-      window.speechSynthesis.cancel()
-      if (audioRef.current) {
-        audioRef.current.pause()
-        audioRef.current = null
-      }
-    }
-  }, [isOpen])
+  }, [profile])
 
   // Fetch nearby hospitals & pharmacies when ward changes and popup is open
   useEffect(() => {
@@ -2938,80 +2891,37 @@ function CitizensAdvisoryPopup({ state, advisory, lang, onChangeLang, selectedWa
 
   if (!state) return null
 
-  const handleSpeak = () => {
-    if (!advisory) return
-    
-    if (isSpeaking) {
-      if (audioRef.current) {
-        audioRef.current.pause()
-        audioRef.current = null
+  const handleSubscribe = async () => {
+    if (!selectedWard) return;
+    setSubscribing(true);
+    try {
+      const response = await fetch(`/api/advisory/subscribe?ward_id=${selectedWard.id}&profile=${personalProfile}&channel=${alertChannel}&lang=${lang}`, {
+        method: 'POST'
+      });
+      const data = await response.json();
+      if (data.status === 'success') {
+        setSubscriptionActive(true);
+        onChangeProfile(personalProfile);
+        await onLoadAdvisory(selectedWard.id, lang, personalProfile);
       }
-      window.speechSynthesis.cancel()
-      setIsSpeaking(false)
-      return
-    }
-
-    const tLang = lang in speakTemplates ? lang : 'en'
-    const transLevel = levelTranslations[tLang]?.[advisory.level] || advisory.level.replace('_', ' ')
-    const translatedPrecautions = advisory.precautions.map(p => precautionTranslations[tLang]?.[p] || p)
-    
-    const prefixText = getPersonalizedPrefix()
-    const textToRead = prefixText + speakTemplates[tLang](
-      advisory.ward_name,
-      Math.round(advisory.aqi),
-      transLevel,
-      advisory.advisory,
-      translatedPrecautions
-    )
-
-    let langCode = 'en-IN'
-    if (lang === 'hi') langCode = 'hi-IN'
-    else if (lang === 'kn') langCode = 'kn-IN'
-    else if (lang === 'ta') langCode = 'ta-IN'
-    else if (lang === 'te') langCode = 'te-IN'
-
-    if (lang !== 'en') {
-      // Force Google Translate TTS cloud audio stream for all non-English languages using 2-letter codes
-      console.log(`Using Google Translate cloud TTS: ${lang}`)
-      const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${lang}&client=tw-ob&q=${encodeURIComponent(textToRead)}`
-      
-      const audio = new Audio(url)
-      audioRef.current = audio
-      audio.onended = () => setIsSpeaking(false)
-      audio.onerror = (e) => {
-        console.error("Cloud Audio error event, falling back to local synthesis:", e)
-        const utterance = new SpeechSynthesisUtterance(textToRead)
-        utterance.lang = langCode
-        utterance.onend = () => setIsSpeaking(false)
-        utterance.onerror = () => setIsSpeaking(false)
-        window.speechSynthesis.speak(utterance)
-      }
-      
-      setIsSpeaking(true)
-      audio.play().catch(err => {
-        console.error("Cloud Audio play failed, falling back to local synthesis:", err)
-        // Fallback to local synthesis
-        const utterance = new SpeechSynthesisUtterance(textToRead)
-        utterance.lang = langCode
-        utterance.onend = () => setIsSpeaking(false)
-        utterance.onerror = () => setIsSpeaking(false)
-        window.speechSynthesis.speak(utterance)
-      })
-    } else {
-      // Standard SpeechSynthesis for English
-      const utterance = new SpeechSynthesisUtterance(textToRead)
-      utterance.lang = langCode
-      const match = voices.find(v => v.lang.toLowerCase().replace('_', '-').startsWith('en'))
-      if (match) {
-        utterance.voice = match
-      }
-      utterance.onend = () => setIsSpeaking(false)
-      utterance.onerror = () => setIsSpeaking(false)
-
-      setIsSpeaking(true)
-      window.speechSynthesis.speak(utterance)
+    } catch (err) {
+      console.error("Subscription failed:", err);
+    } finally {
+      setSubscribing(false);
     }
   }
+
+  const getAqiColor = (aqi) => {
+    if (aqi <= 50) return '#22c55e'
+    if (aqi <= 100) return '#84cc16'
+    if (aqi <= 200) return '#eab308'
+    if (aqi <= 300) return '#f97316'
+    if (aqi <= 400) return '#ef4444'
+    return '#a855f7'
+  }
+
+  const aqiValue = advisory ? advisory.aqi : 0;
+  const pct = Math.min((aqiValue / 500) * 100, 100);
 
   return (
     <div className="advisory-widget-container">
@@ -3049,96 +2959,66 @@ function CitizensAdvisoryPopup({ state, advisory, lang, onChangeLang, selectedWa
             <button className="advisory-close-btn" onClick={onToggle}>&times;</button>
           </div>
 
-          {/* Controls */}
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <div style={{ flex: 1 }}>
-              <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
-                Select Ward
-              </label>
-              <select
-                id="select-ward"
-                className="select-field"
-                style={{ width: '100%', padding: '6px 8px', fontSize: 13 }}
-                value={selectedWard?.id || ''}
-                onChange={e => {
-                  const ward = state.wards.find(w => w.id === e.target.value)
-                  if (ward) onSelectWard(ward)
-                }}
-              >
-                {state.wards.map(w => (
-                  <option key={w.id} value={w.id}>
-                    {w.name} (AQI {Math.round(w.current_aqi)})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div style={{ width: '120px' }}>
-              <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
-                Language
-              </label>
-              <select
-                id="select-language"
-                className="select-field"
-                style={{ width: '100%', padding: '6px 8px', fontSize: 13 }}
-                value={lang}
-                onChange={e => onChangeLang(e.target.value)}
-              >
-                {LANGUAGES.map(l => (
-                  <option key={l.code} value={l.code}>{l.label}</option>
-                ))}
-              </select>
-            </div>
+          <div style={{ padding: '12px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase' }}>Select Language</span>
+            <select 
+              value={lang} 
+              onChange={(e) => {
+                onChangeLang(e.target.value);
+                if (selectedWard) onLoadAdvisory(selectedWard.id, e.target.value, personalProfile);
+              }}
+              style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#ffffff', cursor: 'pointer' }}
+            >
+              <option value="en">English</option>
+              <option value="hi">Hindi</option>
+              <option value="kn">Kannada</option>
+              <option value="ta">Tamil</option>
+              <option value="te">Telugu</option>
+            </select>
           </div>
 
           {/* Advisory output */}
           {advisory ? (
-            <div className={`advisory-card level-${advisory.level}`} style={{ padding: '16px', margin: 0, borderRadius: 'var(--radius-md)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                    {advisory.ward_name} · {advisory.language}
-                  </div>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: aqiColor(advisory.aqi), marginTop: 2 }}>
-                    AQI {Math.round(advisory.aqi)}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
-                  <span className={`aqi-badge ${advisory.level}`} style={{ fontSize: 11, padding: '2px 8px' }}>
-                    {advisory.level.replace('_', ' ')}
-                  </span>
-                  <button
-                    onClick={handleSpeak}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      padding: '4px 8px',
-                      borderRadius: '8px',
-                      fontSize: '11px',
-                      fontWeight: '600',
-                      background: isSpeaking ? 'rgba(239, 68, 68, 0.2)' : 'rgba(6, 182, 212, 0.15)',
-                      color: isSpeaking ? '#ef4444' : 'var(--accent-primary)',
-                      border: '1px solid currentColor',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                    }}
-                  >
-                    {isSpeaking ? (
-                      <>
-                        <VolumeX size={11} />
-                        <span>Stop</span>
-                      </>
-                    ) : (
-                      <>
-                        <Volume2 size={11} />
-                        <span>Listen</span>
-                      </>
-                    )}
-                  </button>
-                </div>
+            <div style={{ padding: '16px', overflowY: 'auto', maxHeight: 'calc(100vh - 250px)' }}>
+              
+              {/* AQI Numerical Scale & Multi-color Scale */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '4px' }}>
+                <span style={{ fontSize: '12px', fontWeight: '600', color: '#64748b' }}>{advisory.ward_name}</span>
+                <span style={{ fontSize: '24px', fontWeight: '800', color: getAqiColor(advisory.aqi) }}>
+                  AQI {Math.round(advisory.aqi)}
+                </span>
               </div>
-              <div className="advisory-text" style={{ fontSize: 14, margin: '12px 0', lineHeight: 1.5 }}>
-                <span style={{ fontWeight: '800', color: '#0f172a' }}>{getPersonalizedPrefix()}</span>
+              <span className={`aqi-badge ${advisory.level}`} style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '4px', display: 'inline-block', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '8px' }}>
+                {advisory.level.replace('_', ' ')}
+              </span>
+
+              {/* Color Bar Scale */}
+              <div style={{ position: 'relative', height: '10px', width: '100%', borderRadius: '5px', background: 'linear-gradient(to right, #22c55e, #84cc16, #eab308, #f97316, #ef4444, #a855f7)', marginTop: '8px', marginBottom: '6px' }}>
+                <div style={{
+                  position: 'absolute',
+                  left: `calc(${pct}% - 5px)`,
+                  top: '-3px',
+                  width: '10px',
+                  height: '16px',
+                  background: '#ffffff',
+                  border: '2px solid #0f172a',
+                  borderRadius: '2px',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+                  transition: 'left 0.3s ease-out'
+                }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', color: '#94a3b8', marginBottom: '14px', padding: '0 2px' }}>
+                <span>0</span>
+                <span>50</span>
+                <span>100</span>
+                <span>200</span>
+                <span>300</span>
+                <span>400</span>
+                <span>500+</span>
+              </div>
+
+              {/* Main Advisory text */}
+              <div className="advisory-text" style={{ fontSize: '13px', margin: '12px 0', lineHeight: '1.5', color: '#334155' }}>
                 {advisory.advisory}
               </div>
               
@@ -3149,51 +3029,85 @@ function CitizensAdvisoryPopup({ state, advisory, lang, onChangeLang, selectedWa
                   padding: '10px 12px', 
                   background: '#f1f5f9', 
                   borderRadius: '6px', 
-                  fontSize: '12px', 
-                  borderLeft: `3px solid ${aqiColor(advisory.aqi)}`,
-                  color: '#334155',
+                  fontSize: '11px', 
+                  borderLeft: `3px solid ${getAqiColor(advisory.aqi)}`,
+                  color: '#475569',
                   lineHeight: '1.4',
                   border: '1px solid #e2e8f0',
                   borderLeftWidth: '3px'
                 }}>
                   <strong style={{ color: '#0f172a', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
-                    <Search size={12} color="#3b82f6" /> Driver Analysis:
+                    <Search size={12} color="#3b82f6" /> Driver Analysis
                   </strong>
                   {advisory.reason}
                 </div>
               )}
 
-              {advisory.precautions.length > 0 && (
-                <div style={{ marginTop: 12 }}>
-                  <div className="card-title" style={{ fontSize: 11, marginBottom: 6 }}>Precautions</div>
-                  <ul className="precaution-list" style={{ fontSize: 13, gap: 6, display: 'flex', flexDirection: 'column' }}>
-                    {advisory.precautions.map((p, i) => {
-                      const translatedP = precautionTranslations[lang]?.[p] || p;
-                      return (
-                        <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'rgba(255,255,255,0.02)', padding: '6px 8px', borderRadius: '6px' }}>
-                          <span style={{ fontSize: '18px', lineHeight: 1 }}>{getPrecautionEmoji(p)}</span>
-                          <span>{translatedP}</span>
-                        </li>
-                      );
-                    })}
-                  </ul>
+              {/* Precautions Grid of 3 Cards */}
+              <div style={{ marginTop: '16px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.5px' }}>Recommended Precautions</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                  {/* Card 1: N95 Mask */}
+                  <div style={{ padding: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                    <Shield size={18} color="#3b82f6" style={{ marginBottom: '4px' }} />
+                    <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#0f172a' }}>N95 Mask</span>
+                    <span style={{ fontSize: '9px', color: '#64748b', marginTop: '4px', lineHeight: '1.2' }}>
+                      {advisory.precautions && advisory.precautions[0] ? advisory.precautions[0] : 'Not required'}
+                    </span>
+                  </div>
+                  {/* Card 2: Close Windows */}
+                  <div style={{ padding: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                    <Wind size={18} color="#10b981" style={{ marginBottom: '4px' }} />
+                    <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#0f172a' }}>Close Windows</span>
+                    <span style={{ fontSize: '9px', color: '#64748b', marginTop: '4px', lineHeight: '1.2' }}>
+                      {advisory.precautions && advisory.precautions[1] ? advisory.precautions[1] : 'Windows open'}
+                    </span>
+                  </div>
+                  {/* Card 3: Avoid Exertion */}
+                  <div style={{ padding: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                    <AlertTriangle size={18} color="#f59e0b" style={{ marginBottom: '4px' }} />
+                    <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#0f172a' }}>Avoid Exertion</span>
+                    <span style={{ fontSize: '9px', color: '#64748b', marginTop: '4px', lineHeight: '1.2' }}>
+                      {advisory.precautions && advisory.precautions[2] ? advisory.precautions[2] : 'Safe outdoors'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Green Health Tip Banner */}
+              {advisory.health_tip && (
+                <div style={{
+                  marginTop: '16px',
+                  padding: '10px 12px',
+                  background: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  color: '#15803d',
+                  fontSize: '11px',
+                  lineHeight: '1.4'
+                }}>
+                  <Heart size={14} color="#16a34a" style={{ flexShrink: 0 }} />
+                  <span>{advisory.health_tip}</span>
                 </div>
               )}
 
               {/* Vulnerability chips */}
               {advisory.vulnerable_info && (
-                <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
-                  <div className="chip-row" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <div className="chip" style={{ fontSize: 11, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: '4px', background: '#ffffff', border: '1px solid #e2e8f0' }}>
-                      <Building2 size={12} color="#3b82f6" />
+                <div style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+                  <div className="chip-row" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <div className="chip" style={{ fontSize: 10, padding: '2px 6px', display: 'flex', alignItems: 'center', gap: '4px', background: '#ffffff', border: '1px solid #e2e8f0' }}>
+                      <Building2 size={11} color="#3b82f6" />
                       <span>{advisory.vulnerable_info.hospitals} Hosp.</span>
                     </div>
-                    <div className="chip" style={{ fontSize: 11, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: '4px', background: '#ffffff', border: '1px solid #e2e8f0' }}>
-                      <GraduationCap size={12} color="#f59e0b" />
+                    <div className="chip" style={{ fontSize: 10, padding: '2px 6px', display: 'flex', alignItems: 'center', gap: '4px', background: '#ffffff', border: '1px solid #e2e8f0' }}>
+                      <Building2 size={11} color="#f59e0b" />
                       <span>{advisory.vulnerable_info.schools} Schools</span>
                     </div>
-                    <div className="chip" style={{ fontSize: 11, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: '4px', background: '#ffffff', border: '1px solid #e2e8f0' }}>
-                      <Users size={12} color="#10b981" />
+                    <div className="chip" style={{ fontSize: 10, padding: '2px 6px', display: 'flex', alignItems: 'center', gap: '4px', background: '#ffffff', border: '1px solid #e2e8f0' }}>
+                      <Users size={11} color="#10b981" />
                       <span>{advisory.vulnerable_info.elderly_pct}% Elderly</span>
                     </div>
                   </div>
@@ -3279,11 +3193,12 @@ function CitizensAdvisoryPopup({ state, advisory, lang, onChangeLang, selectedWa
                       gap: '6px',
                       transition: 'all 0.2s'
                     }}
-                    onClick={() => {
-                      setSubscriptionActive(true);
-                    }}
+                    onClick={handleSubscribe}
+                    disabled={subscribing}
                   >
-                    {subscriptionActive ? (
+                    {subscribing ? (
+                      <span>Applying...</span>
+                    ) : subscriptionActive ? (
                       <>
                         <CheckCircle size={12} />
                         <span>Profile Advisory Applied</span>
@@ -3312,7 +3227,7 @@ function CitizensAdvisoryPopup({ state, advisory, lang, onChangeLang, selectedWa
                       lineHeight: '1.3',
                       animation: 'fadeIn 0.2s ease-in-out'
                     }}>
-                      <BellRing size={11} style={{ marginTop: '2px', flexShrink: 0 }} />
+                      <CheckCircle size={11} style={{ marginTop: '2px', flexShrink: 0 }} />
                       <span>
                         Advisory personalized! {alertChannel !== 'none' && `Alert subscription registered successfully for ${alertChannel.toUpperCase()} alerts.`}
                       </span>
@@ -3381,9 +3296,6 @@ function CitizensAdvisoryPopup({ state, advisory, lang, onChangeLang, selectedWa
     </div>
   )
 }
-
-/* ── Evidence Modal ────────────────────────────────────────────────────── */
-
 function EvidenceModal({ data, onClose }) {
   const [dispatched, setDispatched] = useState(false)
 
