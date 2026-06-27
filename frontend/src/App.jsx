@@ -26,7 +26,7 @@ import {
   Car, Hammer, Flame, Leaf, RefreshCw, Eye, FileText, Navigation,
   ChevronRight, Clock, Gauge, AlertCircle, CheckCircle, XCircle,
   Satellite, Building2, GraduationCap, Heart, ArrowUpRight,
-  Volume2, VolumeX, ExternalLink, Info, Radio
+  Volume2, VolumeX, ExternalLink, Info, Radio, Phone
 } from 'lucide-react'
 
 ChartJS.register(
@@ -3042,7 +3042,17 @@ function CitizensAdvisoryPopup({ state, advisory, lang, onChangeLang, selectedWa
                       transition: 'all 0.2s',
                     }}
                   >
-                    <span>{isSpeaking ? '⏹️ Stop' : '🔊 Listen'}</span>
+                    {isSpeaking ? (
+                      <>
+                        <VolumeX size={11} />
+                        <span>Stop</span>
+                      </>
+                    ) : (
+                      <>
+                        <Volume2 size={11} />
+                        <span>Listen</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
@@ -3119,24 +3129,30 @@ function CitizensAdvisoryPopup({ state, advisory, lang, onChangeLang, selectedWa
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {nearbyPlaces.filter(p => p.type === 'hospital').length > 0 && (
                       <div>
-                        <div style={{ fontSize: 10, fontWeight: 600, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>🏥 Hospitals</div>
+                        <div style={{ fontSize: 10, fontWeight: 600, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Building2 size={11} color="#ef4444" />
+                          <span>Hospitals</span>
+                        </div>
                         {nearbyPlaces.filter(p => p.type === 'hospital').slice(0, 3).map((p, i) => (
                           <div key={`h-${i}`} style={{ background: 'rgba(239,68,68,0.06)', padding: '6px 8px', borderRadius: 6, marginBottom: 4, fontSize: 12, borderLeft: '2px solid #ef4444' }}>
                             <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{p.name}</div>
-                            {p.address && <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>📍 {p.address}</div>}
-                            {p.phone && <div style={{ color: 'var(--accent-primary)', fontSize: 11 }}>📞 {p.phone}</div>}
+                            {p.address && <div style={{ color: 'var(--text-muted)', fontSize: 11, display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}><MapPin size={10} color="#64748b" /> {p.address}</div>}
+                            {p.phone && <div style={{ color: 'var(--accent-primary)', fontSize: 11, display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}><Phone size={10} color="#ef4444" /> {p.phone}</div>}
                           </div>
                         ))}
                       </div>
                     )}
                     {nearbyPlaces.filter(p => p.type === 'pharmacy').length > 0 && (
                       <div>
-                        <div style={{ fontSize: 10, fontWeight: 600, color: '#22c55e', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>💊 Medical Stores / Pharmacies</div>
+                        <div style={{ fontSize: 10, fontWeight: 600, color: '#22c55e', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Activity size={11} color="#22c55e" />
+                          <span>Medical Stores / Pharmacies</span>
+                        </div>
                         {nearbyPlaces.filter(p => p.type === 'pharmacy').slice(0, 3).map((p, i) => (
                           <div key={`p-${i}`} style={{ background: 'rgba(34,197,94,0.06)', padding: '6px 8px', borderRadius: 6, marginBottom: 4, fontSize: 12, borderLeft: '2px solid #22c55e' }}>
                             <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{p.name}</div>
-                            {p.address && <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>📍 {p.address}</div>}
-                            {p.phone && <div style={{ color: 'var(--accent-primary)', fontSize: 11 }}>📞 {p.phone}</div>}
+                            {p.address && <div style={{ color: 'var(--text-muted)', fontSize: 11, display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}><MapPin size={10} color="#64748b" /> {p.address}</div>}
+                            {p.phone && <div style={{ color: 'var(--accent-primary)', fontSize: 11, display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}><Phone size={10} color="#22c55e" /> {p.phone}</div>}
                           </div>
                         ))}
                       </div>
