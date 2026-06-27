@@ -2050,6 +2050,19 @@ function CitizensAdvisoryPopup({ state, advisory, lang, onChangeLang, selectedWa
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [nearbyPlaces, setNearbyPlaces] = useState(null)
   const [nearbyLoading, setNearbyLoading] = useState(false)
+  const [voices, setVoices] = useState([])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return
+    const updateVoices = () => {
+      setVoices(window.speechSynthesis.getVoices())
+    }
+    updateVoices()
+    window.speechSynthesis.onvoiceschanged = updateVoices
+    return () => {
+      window.speechSynthesis.onvoiceschanged = null
+    }
+  }, [])
 
   useEffect(() => {
     return () => {
@@ -2117,8 +2130,7 @@ function CitizensAdvisoryPopup({ state, advisory, lang, onChangeLang, selectedWa
     
     utterance.lang = langCode
 
-    // Explicitly locate voice matching language tag
-    const voices = window.speechSynthesis.getVoices()
+    // Explicitly locate voice matching language tag from loaded voices state
     const match = voices.find(v => v.lang.toLowerCase().replace('_', '-').startsWith(langCode.substring(0, 2).toLowerCase()))
     if (match) {
       utterance.voice = match
