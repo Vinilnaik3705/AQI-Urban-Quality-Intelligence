@@ -1969,8 +1969,52 @@ function EnforcementView({ dispatches, onRefresh, onViewEvidence }) {
 
 /* ── Citizens Advisory Popup ───────────────────────────────────────────── */
 
+function getPrecautionEmoji(precautionText) {
+  const text = precautionText.toLowerCase();
+  if (text.includes('mask')) return '😷';
+  if (text.includes('indoor') || text.includes('inside') || text.includes('window') || text.includes('stay home')) return '🏠';
+  if (text.includes('purifier') || text.includes('filtration')) return '🌀';
+  if (text.includes('exercise') || text.includes('outdoor') || text.includes('sport') || text.includes('jogging') || text.includes('activity')) return '🚴‍♂️❌';
+  if (text.includes('water') || text.includes('hydrate') || text.includes('fluid') || text.includes('drink')) return '💧';
+  if (text.includes('doctor') || text.includes('hospital') || text.includes('medical') || text.includes('symptom') || text.includes('health') || text.includes('physician')) return '🩺';
+  if (text.includes('elder') || text.includes('senior') || text.includes('child') || text.includes('kid') || text.includes('baby') || text.includes('pregnant')) return '👴👶';
+  return '⚠️';
+}
+
 function CitizensAdvisoryPopup({ state, advisory, lang, onChangeLang, selectedWard, onSelectWard, isOpen, onToggle }) {
+  const [isSpeaking, setIsSpeaking] = useState(false)
+
+  useEffect(() => {
+    return () => {
+      window.speechSynthesis.cancel()
+    }
+  }, [isOpen])
+
   if (!state) return null
+
+  const handleSpeak = () => {
+    if (!advisory) return
+    
+    if (isSpeaking) {
+      window.speechSynthesis.cancel()
+      setIsSpeaking(false)
+      return
+    }
+
+    const textToRead = `${advisory.ward_name} Health Advisory. AQI is ${Math.round(advisory.aqi)}. Level is ${advisory.level.replace('_', ' ')}. Advisory: ${advisory.advisory}. Key Precautions: ${advisory.precautions.join('. ')}`
+    const utterance = new SpeechSynthesisUtterance(textToRead)
+    
+    if (lang === 'hi') utterance.lang = 'hi-IN'
+    else if (lang === 'kn') utterance.lang = 'kn-IN'
+    else if (lang === 'ta') utterance.lang = 'ta-IN'
+    else utterance.lang = 'en-IN'
+
+    utterance.onend = () => setIsSpeaking(false)
+    utterance.onerror = () => setIsSpeaking(false)
+
+    setIsSpeaking(true)
+    window.speechSynthesis.speak(utterance)
+  }
 
   return (
     <div className="advisory-widget-container">
@@ -2060,9 +2104,30 @@ function CitizensAdvisoryPopup({ state, advisory, lang, onChangeLang, selectedWa
                     AQI {Math.round(advisory.aqi)}
                   </div>
                 </div>
-                <span className={`aqi-badge ${advisory.level}`} style={{ fontSize: 11, padding: '2px 8px' }}>
-                  {advisory.level.replace('_', ' ')}
-                </span>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+                  <span className={`aqi-badge ${advisory.level}`} style={{ fontSize: 11, padding: '2px 8px' }}>
+                    {advisory.level.replace('_', ' ')}
+                  </span>
+                  <button
+                    onClick={handleSpeak}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '4px 8px',
+                      borderRadius: '8px',
+                      fontSize: '11px',
+                      fontWeight: '600',
+                      background: isSpeaking ? 'rgba(239, 68, 68, 0.2)' : 'rgba(6, 182, 212, 0.15)',
+                      color: isSpeaking ? '#ef4444' : 'var(--accent-primary)',
+                      border: '1px solid currentColor',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    <span>{isSpeaking ? '⏹️ Stop' : '🔊 Listen'}</span>
+                  </button>
+                </div>
               </div>
               <div className="advisory-text" style={{ fontSize: 14, margin: '12px 0', lineHeight: 1.5 }}>
                 {advisory.advisory}
@@ -2090,10 +2155,10 @@ function CitizensAdvisoryPopup({ state, advisory, lang, onChangeLang, selectedWa
               {advisory.precautions.length > 0 && (
                 <div style={{ marginTop: 12 }}>
                   <div className="card-title" style={{ fontSize: 11, marginBottom: 6 }}>Precautions</div>
-                  <ul className="precaution-list" style={{ fontSize: 13, gap: 4, display: 'flex', flexDirection: 'column' }}>
+                  <ul className="precaution-list" style={{ fontSize: 13, gap: 6, display: 'flex', flexDirection: 'column' }}>
                     {advisory.precautions.map((p, i) => (
-                      <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-                        <span style={{ color: 'var(--accent-primary)' }}>•</span>
+                      <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'rgba(255,255,255,0.02)', padding: '6px 8px', borderRadius: '6px' }}>
+                        <span style={{ fontSize: '18px', lineHeight: 1 }}>{getPrecautionEmoji(p)}</span>
                         <span>{p}</span>
                       </li>
                     ))}
