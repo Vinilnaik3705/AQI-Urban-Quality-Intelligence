@@ -728,41 +728,56 @@ function AqiGauge({ aqi }) {
 
 /* ── Custom Animated Wind Stream Layer ───────────────────────────────────── */
 
-function WindStreamAnimation({ lat, lng }) {
+/* ── Custom Animated Wind Stream Layer ───────────────────────────────────── */
+
+const WIND_GRID_CITIES = [
+  { name: 'Delhi',     lat: 28.61, lng: 77.20 },
+  { name: 'Mumbai',    lat: 19.07, lng: 72.87 },
+  { name: 'Bengaluru', lat: 12.97, lng: 77.59 },
+  { name: 'Chennai',   lat: 13.08, lng: 80.27 },
+  { name: 'Hyderabad', lat: 17.38, lng: 78.48 },
+  { name: 'Kolkata',   lat: 22.57, lng: 88.36 }
+];
+
+function WindStreamAnimation() {
   const map = useMap();
   const canvasRef = useRef(null);
-  const [windAngle, setWindAngle] = useState(-Math.PI / 5); // default SW to NE
-  const [windSpeed, setWindSpeed] = useState(1.5); // default speed factor
+  const [gridWind, setGridWind] = useState([]);
 
-  // Fetch real wind direction dynamically using hourly Open-Meteo endpoint
+  // Fetch real wind parameters dynamically for 6 major regions across India
   useEffect(() => {
-    async function fetchWindDirection() {
-      if (!lat || !lng) return;
+    async function fetchGridWind() {
       try {
-        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&hourly=windspeed_10m,winddirection_10m`);
+        const lats = WIND_GRID_CITIES.map(c => c.lat).join(',');
+        const lngs = WIND_GRID_CITIES.map(c => c.lng).join(',');
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lngs}&hourly=windspeed_10m,winddirection_10m`);
         if (res.ok) {
           const data = await res.json();
-          if (data.hourly && data.hourly.winddirection_10m && data.hourly.winddirection_10m.length > 0) {
-            const dir = data.hourly.winddirection_10m[0];
-            const speed = data.hourly.windspeed_10m ? data.hourly.windspeed_10m[0] : 12.3;
-            
-            // Meteorological wind direction is where wind blows FROM. Trajectory is (dir + 180) degrees.
-            const angleRad = ((dir + 180) % 360) * Math.PI / 180;
-            setWindAngle(angleRad);
-            
-            // Scale windspeed_10m to particle speed
-            const calculatedSpeed = Math.min(3.5, Math.max(0.8, speed / 8));
-            setWindSpeed(calculatedSpeed);
-            
-            console.log(`Open-Meteo Wind API success at lat=${lat}, lng=${lng}: direction=${dir}deg, speed=${speed}km/h -> flowAngle=${angleRad.toFixed(2)}rad, particleSpeed=${calculatedSpeed.toFixed(2)}`);
+          if (Array.isArray(data)) {
+            const parsed = data.map((item, idx) => {
+              const dir = item.hourly?.winddirection_10m?.[0] ?? 245;
+              const speed = item.hourly?.windspeed_10m?.[0] ?? 12.3;
+              
+              // Meteorological direction (FROM) -> vector trajectory angle (TO) in radians
+              const angleRad = ((dir + 180) % 360) * Math.PI / 180;
+              const scaledSpeed = Math.min(3.5, Math.max(0.8, speed / 8));
+              
+              return {
+                lat: WIND_GRID_CITIES[idx].lat,
+                lng: WIND_GRID_CITIES[idx].lng,
+                angle: angleRad,
+                speed: scaledSpeed
+              };
+            });
+            setGridWind(parsed);
           }
         }
       } catch (e) {
-        console.error('Failed to fetch real-time wind direction from hourly API', e);
+        console.error('Failed to fetch grid wind data from Open-Meteo', e);
       }
     }
-    fetchWindDirection();
-  }, [lat, lng]);
+    fetchGridWind();
+  }, []);
 
   useEffect(() => {
     const container = map.getContainer();
@@ -782,7 +797,7 @@ function WindStreamAnimation({ lat, lng }) {
 
     // Dense set of animated flow stream particles
     const particles = [];
-    const particleCount = 140;
+    const particleCount = 150;
 
     const resizeCanvas = () => {
       canvas.width = container.clientWidth;
@@ -791,15 +806,14 @@ function WindStreamAnimation({ lat, lng }) {
     resizeCanvas();
     map.on('resize', resizeCanvas);
 
-    // Initialize particles with dynamic wind angle and speed factor
+    // Initialize particles randomly across the screen
     for (let i = 0; i < particleCount; i++) {
       particles.push({
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
-        length: 20 + Math.random() * 30,
-        speed: (1.2 + Math.random() * 1.8) * (windSpeed / 1.5),
+        length: 20 + Math.random() * 25,
         opacity: 0.12 + Math.random() * 0.35,
-        angle: windAngle
+        speedMultiplier: 0.8 + Math.random() * 0.4
       });
     }
 
@@ -808,31 +822,59 @@ function WindStreamAnimation({ lat, lng }) {
       ctx.lineWidth = 1.0;
       ctx.lineCap = 'round';
 
+      // Get current map bounds for fast linear coordinate mapping
+      const bounds = map.getBounds();
+      const west = bounds.getWest();
+      const east = bounds.getEast();
+      const north = bounds.getNorth();
+      const south = bounds.getSouth();
+
       particles.forEach(p => {
+        // Map particle's screen (x, y) to geographical coordinates
+        const pctX = p.x / canvas.width;
+        const pctY = p.y / canvas.height;
+        const pLng = west + pctX * (east - west);
+        const pLat = north - pctY * (north - south);
+
+        // Find closest wind vector grid point
+        let nearestCity = null;
+        let minDistSq = Infinity;
+
+        if (gridWind.length > 0) {
+          gridWind.forEach(city => {
+            const dLat = city.lat - pLat;
+            const dLng = city.lng - pLng;
+            const distSq = dLat * dLat + dLng * dLng;
+            if (distSq < minDistSq) {
+              minDistSq = distSq;
+              nearestCity = city;
+            }
+          });
+        }
+
+        // Fallback to default SW-to-NE wind direction if grid is loading
+        const angle = nearestCity ? nearestCity.angle : -Math.PI / 5;
+        const speed = (nearestCity ? nearestCity.speed : 1.5) * p.speedMultiplier;
+
         ctx.beginPath();
         ctx.strokeStyle = `rgba(248, 250, 252, ${p.opacity})`;
         
-        // Draw path line
-        const targetX = p.x + Math.cos(p.angle) * p.length;
-        const targetY = p.y + Math.sin(p.angle) * p.length;
+        // Draw path line following local vector
+        const targetX = p.x + Math.cos(angle) * p.length;
+        const targetY = p.y + Math.sin(angle) * p.length;
         
         ctx.moveTo(p.x, p.y);
         ctx.lineTo(targetX, targetY);
         ctx.stroke();
 
-        // Move particle along the trajectory
-        p.x += Math.cos(p.angle) * p.speed;
-        p.y += Math.sin(p.angle) * p.speed;
+        // Move particle along current local trajectory
+        p.x += Math.cos(angle) * speed;
+        p.y += Math.sin(angle) * speed;
 
-        // Reset particle if it leaves canvas borders
+        // Reset particle if it leaves canvas boundaries
         if (p.x > canvas.width || p.y > canvas.height || p.x < -p.length || p.y < -p.length) {
-          if (Math.random() > 0.5) {
-            p.x = -p.length;
-            p.y = Math.random() * canvas.height;
-          } else {
-            p.x = Math.random() * canvas.width;
-            p.y = -p.length;
-          }
+          p.x = Math.random() * canvas.width;
+          p.y = Math.random() * canvas.height;
         }
       });
 
@@ -853,7 +895,7 @@ function WindStreamAnimation({ lat, lng }) {
         canvas.parentNode.removeChild(canvas);
       }
     };
-  }, [map, windAngle, windSpeed]);
+  }, [map, gridWind]);
 
   return null;
 }
@@ -1127,12 +1169,7 @@ function CommandCenter({ state, selectedWard, onSelectWard, mapStyle, setMapStyl
             )}
 
             {/* Custom Wind Particle Animation Overlay */}
-            {showWind && (
-              <WindStreamAnimation
-                lat={selectedWard?.center?.[0] ?? targetCenter?.[0] ?? state?.city?.center?.[0] ?? 17.3850}
-                lng={selectedWard?.center?.[1] ?? targetCenter?.[1] ?? state?.city?.center?.[1] ?? 78.4867}
-              />
-            )}
+            {showWind && <WindStreamAnimation />}
 
             {/* Registered Emission Sources (Toggled by Factories, Vehicular, Construction) */}
             {state.sources && state.sources.map(src => {
