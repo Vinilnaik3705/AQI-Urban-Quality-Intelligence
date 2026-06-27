@@ -772,8 +772,8 @@ function CommandCenter({ state, selectedWard, onSelectWard, mapStyle, setMapStyl
   });
 
   return (
-    <>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%', overflowY: 'auto' }}>
+    <div className="content-area" style={{ display: 'flex', flexDirection: 'row', gap: '24px', flex: 1, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', flex: 1, overflowY: 'auto' }}>
       <div className="iqair-layout-grid" style={{ minHeight: '520px' }}>
         {/* Left Column */}
         <div className="iqair-left-panel">
@@ -1334,7 +1334,7 @@ function CommandCenter({ state, selectedWard, onSelectWard, mapStyle, setMapStyl
           </div>
         )}
       </div>
-    </>
+    </div>
   );
 }
 
