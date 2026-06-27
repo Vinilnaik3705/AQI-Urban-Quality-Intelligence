@@ -2413,9 +2413,9 @@ function EnforcementView({ dispatches, onRefresh, onViewEvidence }) {
   const [filter, setFilter] = useState('all') // all | severe | very_poor | poor
 
   const SEVERITY_CONFIG = {
-    severe:    { color: '#ef4444', bg: 'rgba(239,68,68,0.12)',    label: 'SEVERE',    icon: '🔴' },
-    very_poor: { color: '#f97316', bg: 'rgba(249,115,22,0.10)',   label: 'VERY POOR', icon: '🟠' },
-    poor:      { color: '#eab308', bg: 'rgba(234,179,8,0.10)',    label: 'POOR',      icon: '🟡' },
+    severe:    { color: '#ef4444', bg: 'rgba(239,68,68,0.06)',    label: 'SEVERE',    icon: 'AlertCircle' },
+    very_poor: { color: '#f97316', bg: 'rgba(249,115,22,0.05)',   label: 'VERY POOR', icon: 'AlertTriangle' },
+    poor:      { color: '#eab308', bg: 'rgba(234,179,8,0.05)',    label: 'POOR',      icon: 'Info' },
   }
 
   const STATUS_CONFIG = {
@@ -2532,27 +2532,41 @@ function EnforcementView({ dispatches, onRefresh, onViewEvidence }) {
             const globalRank = allDispatches.findIndex(x => x.ward_id === d.ward_id) + 1
 
             return (
-              <div key={i} style={{ borderRadius: '12px', border: `1px solid ${sev.color}33`,
-                background: sev.bg, overflow: 'hidden' }}>
+              <div key={i} style={{
+                borderRadius: '12px',
+                border: '1px solid #e2e8f0',
+                background: '#ffffff',
+                borderLeft: `5px solid ${sev.color}`,
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)',
+                overflow: 'hidden',
+                marginBottom: '12px',
+                transition: 'all 0.2s ease'
+              }}>
 
                 {/* Card header row */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px',
-                  padding: '12px 16px', borderBottom: `1px solid ${sev.color}22` }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '14px 16px',
+                  borderBottom: '1px solid #f1f5f9',
+                  background: '#f8fafc'
+                }}>
                   {/* Rank badge */}
                   <div style={{ width: '32px', height: '32px', borderRadius: '50%',
-                    background: `${sev.color}33`, border: `2px solid ${sev.color}`,
+                    background: `${sev.color}15`, border: `2px solid ${sev.color}`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: '12px', fontWeight: '800', color: sev.color, flexShrink: 0 }}>
                     #{globalRank}
                   </div>
 
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '14px', fontWeight: '700', color: '#f1f5f9',
+                    <div style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a',
                       whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {d.ward_name}
                     </div>
-                    <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-                      📍 {d.location[0].toFixed(3)}, {d.location[1].toFixed(3)}
+                    <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <MapPin size={10} color="#64748b" /> {d.location[0].toFixed(3)}, {d.location[1].toFixed(3)}
                     </div>
                   </div>
 
@@ -2566,32 +2580,35 @@ function EnforcementView({ dispatches, onRefresh, onViewEvidence }) {
 
                   {/* Severity badge */}
                   <div style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '11px',
-                    fontWeight: '700', background: `${sev.color}33`, color: sev.color,
-                    border: `1px solid ${sev.color}55`, flexShrink: 0 }}>
-                    {sev.icon} {sev.label}
+                    fontWeight: '700', background: `${sev.color}15`, color: sev.color,
+                    border: `1px solid ${sev.color}33`, flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    {sev.icon === 'AlertCircle' && <AlertCircle size={11} color={sev.color} />}
+                    {sev.icon === 'AlertTriangle' && <AlertTriangle size={11} color={sev.color} />}
+                    {sev.icon === 'Info' && <Info size={11} color={sev.color} />}
+                    <span>{sev.label}</span>
                   </div>
 
                   {/* Priority score */}
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     <div style={{ fontSize: '11px', color: '#64748b' }}>Priority</div>
-                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#38bdf8' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '750', color: '#38bdf8' }}>
                       {Math.round(d.priority_score)}
                     </div>
                   </div>
                 </div>
 
                 {/* Card body */}
-                <div style={{ padding: '12px 16px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                <div style={{ padding: '14px 16px', display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
 
                   {/* Left col: pollutants + inferred sources */}
                   <div style={{ flex: '1 1 220px', minWidth: 0 }}>
                     {/* Dominant pollutant */}
                     {d.dominant_pollutant && (
                       <div style={{ marginBottom: '8px' }}>
-                        <span style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                          Dominant Pollutant
+                        <span style={{ fontSize: '11px', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: '600' }}>
+                          Dominant Pollutant:
                         </span>
-                        <span style={{ marginLeft: '8px', fontSize: '12px', fontWeight: '700', color: '#f1f5f9' }}>
+                        <span style={{ marginLeft: '8px', fontSize: '12px', fontWeight: '800', color: '#0f172a' }}>
                           {d.dominant_pollutant}
                         </span>
                       </div>
@@ -2600,12 +2617,13 @@ function EnforcementView({ dispatches, onRefresh, onViewEvidence }) {
                     {/* Exceedances */}
                     {d.pollutant_exceedances?.length > 0 && (
                       <div style={{ marginBottom: '8px' }}>
-                        <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '4px' }}>
+                        <div style={{ fontSize: '11px', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '4px', fontWeight: '600' }}>
                           Limit Breaches
                         </div>
                         {d.pollutant_exceedances.map((exc, j) => (
-                          <div key={j} style={{ fontSize: '12px', color: '#fca5a5', marginBottom: '2px' }}>
-                            ⚡ {exc}
+                          <div key={j} style={{ fontSize: '12px', color: '#b91c1c', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '3px' }}>
+                            <AlertTriangle size={11} color="#ef4444" />
+                            <span>{exc}</span>
                           </div>
                         ))}
                       </div>
@@ -2614,12 +2632,13 @@ function EnforcementView({ dispatches, onRefresh, onViewEvidence }) {
                     {/* Inferred sources */}
                     {d.inferred_sources?.length > 0 && (
                       <div style={{ marginBottom: '8px' }}>
-                        <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '4px' }}>
+                        <div style={{ fontSize: '11px', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '4px', fontWeight: '600' }}>
                           Inferred Source Type
                         </div>
                         {d.inferred_sources.map((src, j) => (
-                          <div key={j} style={{ fontSize: '12px', color: '#cbd5e1', marginBottom: '2px' }}>
-                            🔎 {src}
+                          <div key={j} style={{ fontSize: '12px', color: '#334155', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '3px' }}>
+                            <Search size={11} color="#64748b" />
+                            <span>{src}</span>
                           </div>
                         ))}
                       </div>
@@ -2628,30 +2647,37 @@ function EnforcementView({ dispatches, onRefresh, onViewEvidence }) {
 
                   {/* Middle col: nearby sources */}
                   <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-                    <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '6px' }}>
+                    <div style={{ fontSize: '11px', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 6, fontWeight: '600' }}>
                       Registered Sources Nearby
                     </div>
                     {d.nearby_sources.length > 0 ? (
                       d.nearby_sources.slice(0, 3).map((src, j) => (
                         <div key={j} style={{ display: 'flex', alignItems: 'center', gap: '6px',
-                          marginBottom: '4px', fontSize: '12px', color: '#94a3b8' }}>
-                          <span>{SOURCE_ICONS[src.category] || '📌'}</span>
-                          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          marginBottom: '4px', fontSize: '12px', color: '#334155' }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', color: '#3b82f6' }}>
+                            {src.category === 'industrial' ? <Factory size={11} color="#ef4444" /> :
+                             src.category === 'vehicular' ? <Car size={11} color="#3b82f6" /> :
+                             src.category === 'construction' ? <Hammer size={11} color="#f59e0b" /> :
+                             src.category === 'waste_burning' ? <Flame size={11} color="#10b981" /> :
+                             <MapPin size={11} color="#64748b" />}
+                          </span>
+                          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: '500' }}>
                             {src.name}
                           </span>
-                          <span style={{ color: '#475569', flexShrink: 0 }}>{src.distance_km}km</span>
+                          <span style={{ color: '#64748b', fontSize: '11px', flexShrink: 0 }}>{src.distance_km}km</span>
                         </div>
                       ))
                     ) : (
-                      <div style={{ fontSize: '12px', color: '#475569' }}>No registered sources within 5km</div>
+                      <div style={{ fontSize: '12px', color: '#64748b' }}>No registered sources within 5km</div>
                     )}
 
                     {/* Vulnerability flags */}
                     {d.vulnerability_flags?.length > 0 && (
                       <div style={{ marginTop: '8px' }}>
                         {d.vulnerability_flags.map((flag, j) => (
-                          <div key={j} style={{ fontSize: '11px', color: '#fbbf24', marginBottom: '2px' }}>
-                            {flag}
+                          <div key={j} style={{ fontSize: '11px', color: '#d97706', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '3px', marginBottom: '2px' }}>
+                            <AlertCircle size={10} color="#f59e0b" />
+                            <span>{flag}</span>
                           </div>
                         ))}
                       </div>
@@ -2659,42 +2685,47 @@ function EnforcementView({ dispatches, onRefresh, onViewEvidence }) {
                   </div>
 
                   {/* Right col: actions + status */}
-                  <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+                  <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end', justifyContent: 'space-between', marginLeft: 'auto' }}>
                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                      <button className="btn btn-outline btn-sm" onClick={() => onViewEvidence(d)}>
-                        📄 Evidence
+                      <button className="btn btn-outline btn-sm" onClick={() => onViewEvidence(d)} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: '600' }}>
+                        <FileText size={11} />
+                        <span>Evidence</span>
                       </button>
                       {status === 'pending' && (
                         <button className="btn btn-danger btn-sm"
-                          onClick={() => setStatus(d.ward_id, 'dispatched')}>
-                          🚔 Dispatch
+                          onClick={() => setStatus(d.ward_id, 'dispatched')}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: '600' }}>
+                          <Activity size={11} />
+                          <span>Dispatch</span>
                         </button>
                       )}
                       {status === 'dispatched' && (
                         <button className="btn btn-sm"
-                          style={{ background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.4)', color: '#4ade80' }}
+                          style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', color: '#16a34a', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: '600', cursor: 'pointer' }}
                           onClick={() => setStatus(d.ward_id, 'resolved')}>
-                          ✅ Mark Resolved
+                          <CheckCircle size={11} />
+                          <span>Mark Resolved</span>
                         </button>
                       )}
                     </div>
                     {/* Status pill */}
-                    <div style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '10px',
-                      fontWeight: '700', background: `${stCfg.color}22`, color: stCfg.color,
-                      border: `1px solid ${stCfg.color}44` }}>
-                      ● {stCfg.label}
+                    <div style={{ padding: '3px 8px', borderRadius: '12px', fontSize: '10px',
+                      fontWeight: '700', background: `${stCfg.color}15`, color: stCfg.color,
+                      border: `1px solid ${stCfg.color}33`, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: stCfg.color }} />
+                      <span>{stCfg.label}</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Recommended actions strip */}
                 {d.recommended_actions?.length > 0 && (
-                  <div style={{ borderTop: `1px solid ${sev.color}22`, padding: '8px 16px',
-                    background: 'rgba(0,0,0,0.15)', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <div style={{ borderTop: '1px solid #f1f5f9', padding: '10px 16px',
+                    background: '#f8fafc', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     {d.recommended_actions.map((a, j) => (
-                      <div key={j} style={{ fontSize: '11px', color: '#94a3b8',
-                        background: 'rgba(255,255,255,0.04)', borderRadius: '4px',
-                        padding: '3px 8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div key={j} style={{ fontSize: '11px', color: '#475569',
+                        background: '#ffffff', borderRadius: '6px', fontWeight: '500',
+                        padding: '4px 8px', border: '1px solid #e2e8f0' }}>
                         {a}
                       </div>
                     ))}
@@ -3187,59 +3218,64 @@ function EvidenceModal({ data, onClose }) {
   const POLLUTANT_LIMITS = { pm25: 60, pm10: 100, no2: 40, so2: 40, co: 2, o3: 100 }
   const POLLUTANT_UNITS  = { pm25: 'µg/m³', pm10: 'µg/m³', no2: 'µg/m³', so2: 'µg/m³', co: 'mg/m³', o3: 'µg/m³' }
   const POLLUTANT_LABELS = { pm25: 'PM2.5', pm10: 'PM10', no2: 'NO₂', so2: 'SO₂', co: 'CO', o3: 'O₃' }
-  const SOURCE_ICONS = { industrial: '🏭', vehicular: '🚗', construction: '🏗️', waste_burning: '🔥' }
 
   const sevColor = data.severity === 'severe' ? '#ef4444'
     : data.severity === 'very_poor' ? '#f97316' : '#eab308'
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '520px', maxHeight: '85vh', overflowY: 'auto' }}>
+    <div className="modal-backdrop" onClick={onClose} style={{ backdropFilter: 'blur(6px)', backgroundColor: 'rgba(15, 23, 42, 0.4)' }}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '520px', maxHeight: '85vh', overflowY: 'auto', borderRadius: '16px', background: '#ffffff', border: '1px solid #e2e8f0', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', padding: '24px' }}>
 
         {/* Header */}
-        <div className="modal-header" style={{ borderBottom: `2px solid ${sevColor}44`, paddingBottom: '12px' }}>
+        <div className="modal-header" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '14px', marginBottom: '16px' }}>
           <div>
-            <div className="modal-title" style={{ fontSize: '15px' }}>📋 Enforcement Evidence Package</div>
-            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
-              Generated {new Date(data.evidence?.timestamp).toLocaleString()}
+            <div className="modal-title" style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <FileText size={16} color="#0f172a" />
+              <span>Enforcement Evidence Package</span>
+            </div>
+            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Clock size={11} />
+              <span>Generated {new Date(data.evidence?.timestamp).toLocaleString()}</span>
             </div>
           </div>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
 
         {/* Incident summary */}
-        <div style={{ display: 'flex', gap: '12px', padding: '16px 0 12px', borderBottom: '1px solid #1e293b', alignItems: 'center' }}>
-          <div style={{ textAlign: 'center', minWidth: '64px' }}>
-            <div style={{ fontSize: '36px', fontWeight: '800', color: aqiColor(data.aqi), lineHeight: 1 }}>
+        <div style={{ display: 'flex', gap: '14px', paddingBottom: '16px', borderBottom: '1px solid #f1f5f9', alignItems: 'center' }}>
+          <div style={{ textAlign: 'center', minWidth: '64px', background: `${sevColor}12`, border: `2px solid ${sevColor}`, borderRadius: '12px', padding: '8px 0' }}>
+            <div style={{ fontSize: '32px', fontWeight: '850', color: aqiColor(data.aqi), lineHeight: 1 }}>
               {Math.round(data.aqi)}
             </div>
-            <div style={{ fontSize: '10px', color: '#64748b' }}>AQI-IN</div>
+            <div style={{ fontSize: '9px', color: '#64748b', fontWeight: '700', marginTop: '2px' }}>AQI-IN</div>
           </div>
           <div>
-            <div style={{ fontSize: '15px', fontWeight: '700', color: '#f1f5f9' }}>{data.ward_name}</div>
-            <div style={{ display: 'flex', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
-              <span style={{ padding: '2px 8px', borderRadius: '6px', fontSize: '11px',
-                fontWeight: '700', background: `${sevColor}22`, color: sevColor,
-                border: `1px solid ${sevColor}44` }}>
+            <div style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a' }}>{data.ward_name}</div>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
+              <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '11px',
+                fontWeight: '700', background: `${sevColor}15`, color: sevColor,
+                border: `1px solid ${sevColor}33` }}>
                 {data.severity.replace('_', ' ').toUpperCase()}
               </span>
-              <span style={{ padding: '2px 8px', borderRadius: '6px', fontSize: '11px',
-                color: '#64748b', background: 'rgba(255,255,255,0.05)', border: '1px solid #1e293b' }}>
+              <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '600',
+                color: '#475569', background: '#f1f5f9', border: '1px solid #e2e8f0' }}>
                 Priority: {Math.round(data.priority_score)}
               </span>
             </div>
-            <div style={{ fontSize: '11px', color: '#475569', marginTop: '4px', fontFamily: 'monospace' }}>
-              📍 {data.location[0].toFixed(5)}, {data.location[1].toFixed(5)}
+            <div style={{ fontSize: '11px', color: '#64748b', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <MapPin size={11} />
+              <span>{data.location[0].toFixed(5)}, {data.location[1].toFixed(5)}</span>
             </div>
           </div>
         </div>
 
         {/* Pollutant concentrations */}
-        <div style={{ marginTop: '14px' }}>
-          <div style={{ fontSize: '12px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>
-            🧪 Pollutant Concentrations
+        <div style={{ marginTop: '16px' }}>
+          <div style={{ fontSize: '12px', fontWeight: '750', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Activity size={13} color="#0f172a" />
+            <span>Pollutant Concentrations</span>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {Object.entries(data.evidence?.pollutants || {}).map(([key, val]) => {
               const limit = POLLUTANT_LIMITS[key] || 999
               const exceeded = val > limit
@@ -3247,18 +3283,18 @@ function EvidenceModal({ data, onClose }) {
               return (
                 <div key={key}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px', fontSize: '12px' }}>
-                    <span style={{ color: exceeded ? '#fca5a5' : '#94a3b8', fontWeight: exceeded ? '700' : '400' }}>
+                    <span style={{ color: exceeded ? '#ef4444' : '#334155', fontWeight: exceeded ? '700' : '500', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       {POLLUTANT_LABELS[key] || key.toUpperCase()}
-                      {exceeded && ' ⚡'}
+                      {exceeded && <AlertCircle size={10} color="#ef4444" />}
                     </span>
-                    <span style={{ color: exceeded ? '#fca5a5' : '#94a3b8' }}>
+                    <span style={{ color: exceeded ? '#ef4444' : '#334155', fontWeight: '600' }}>
                       {typeof val === 'number' ? val.toFixed(2) : val} {POLLUTANT_UNITS[key] || ''}
-                      <span style={{ color: '#475569', marginLeft: '4px' }}>/ {limit}</span>
+                      <span style={{ color: '#64748b', marginLeft: '4px', fontWeight: '400', fontSize: '11px' }}>/ {limit} max</span>
                     </span>
                   </div>
-                  <div style={{ height: '4px', background: '#0f172a', borderRadius: '2px', overflow: 'hidden' }}>
-                    <div style={{ width: `${pct}%`, height: '100%', borderRadius: '2px',
-                      background: exceeded ? '#ef4444' : '#22c55e' }} />
+                  <div style={{ height: '5px', background: '#f1f5f9', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{ width: `${pct}%`, height: '100%', borderRadius: '3px',
+                      background: exceeded ? '#ef4444' : '#10b981' }} />
                   </div>
                 </div>
               )
@@ -3268,87 +3304,105 @@ function EvidenceModal({ data, onClose }) {
 
         {/* Inferred source types */}
         {data.inferred_sources?.length > 0 && (
-          <div style={{ marginTop: '14px' }}>
-            <div style={{ fontSize: '12px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
-              🔎 Inferred Source Type (from pollutant signatures)
+          <div style={{ marginTop: '16px' }}>
+            <div style={{ fontSize: '12px', fontWeight: '750', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Search size={13} color="#0f172a" />
+              <span>Inferred Source Type</span>
             </div>
-            {data.inferred_sources.map((src, i) => (
-              <div key={i} style={{ fontSize: '13px', color: '#cbd5e1', marginBottom: '4px' }}>• {src}</div>
-            ))}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {data.inferred_sources.map((src, i) => (
+                <div key={i} style={{ fontSize: '12px', color: '#334155', background: '#f8fafc', padding: '6px 10px', borderRadius: '6px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '500' }}>
+                  <Search size={11} color="#64748b" />
+                  <span>{src}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
         {/* Nearby registered sources */}
-        <div style={{ marginTop: '14px' }}>
-          <div style={{ fontSize: '12px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
-            📍 Registered Emission Sources Within 5km
+        <div style={{ marginTop: '16px' }}>
+          <div style={{ fontSize: '12px', fontWeight: '750', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Factory size={13} color="#0f172a" />
+            <span>Registered Emission Sources (Within 5km)</span>
           </div>
           {data.nearby_sources?.length > 0 ? (
             data.nearby_sources.map((s, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '6px 10px', marginBottom: '4px', background: 'rgba(255,255,255,0.03)',
-                borderRadius: '6px', border: '1px solid #1e293b' }}>
+                padding: '6px 10px', marginBottom: '4px', background: '#f8fafc',
+                borderRadius: '6px', border: '1px solid #e2e8f0' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                  <span>{SOURCE_ICONS[s.category] || '📌'}</span>
-                  <span style={{ fontSize: '12px', color: '#cbd5e1', overflow: 'hidden',
-                    textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', color: '#3b82f6' }}>
+                    {s.category === 'industrial' ? <Factory size={12} color="#ef4444" /> :
+                     s.category === 'vehicular' ? <Car size={12} color="#3b82f6" /> :
+                     s.category === 'construction' ? <Hammer size={12} color="#f59e0b" /> :
+                     s.category === 'waste_burning' ? <Flame size={12} color="#10b981" /> :
+                     <MapPin size={12} color="#64748b" />}
+                  </span>
+                  <span style={{ fontSize: '12px', color: '#334155', overflow: 'hidden',
+                    textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: '600' }}>{s.name}</span>
                 </div>
-                <span style={{ fontSize: '11px', color: '#475569', flexShrink: 0, marginLeft: '8px' }}>
+                <span style={{ fontSize: '11px', color: '#64748b', flexShrink: 0, marginLeft: '8px', fontWeight: '500' }}>
                   {s.distance_km} km
                 </span>
               </div>
             ))
           ) : (
-            <div style={{ fontSize: '12px', color: '#475569' }}>No registered sources within 5km.</div>
+            <div style={{ fontSize: '12px', color: '#64748b' }}>No registered sources within 5km.</div>
           )}
         </div>
 
         {/* Vulnerability flags */}
         {data.vulnerability_flags?.length > 0 && (
-          <div style={{ marginTop: '14px', padding: '10px 12px',
-            background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: '8px' }}>
-            <div style={{ fontSize: '12px', fontWeight: '700', color: '#fbbf24', marginBottom: '6px' }}>
-              ⚠️ Vulnerable Population at Risk
+          <div style={{ marginTop: '16px', padding: '10px 12px',
+            background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '8px' }}>
+            <div style={{ fontSize: '12px', fontWeight: '750', color: '#b45309', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <AlertTriangle size={13} color="#d97706" />
+              <span>Vulnerable Population at Risk</span>
             </div>
             {data.vulnerability_flags.map((f, i) => (
-              <div key={i} style={{ fontSize: '12px', color: '#fbbf24', marginBottom: '2px' }}>{f}</div>
+              <div key={i} style={{ fontSize: '12px', color: '#b45309', marginBottom: '2px', fontWeight: '600' }}>{f}</div>
             ))}
           </div>
         )}
 
         {/* Recommended actions */}
-        <div style={{ marginTop: '14px' }}>
-          <div style={{ fontSize: '12px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
-            📌 Recommended Actions
+        <div style={{ marginTop: '16px' }}>
+          <div style={{ fontSize: '12px', fontWeight: '750', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <CheckCircle size={13} color="#0f172a" />
+            <span>Recommended Actions</span>
           </div>
           {(data.recommended_actions || []).map((a, i) => (
-            <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '6px', fontSize: '13px', color: '#cbd5e1' }}>
-              <span style={{ color: '#38bdf8', flexShrink: 0 }}>{i + 1}.</span>
+            <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '6px', fontSize: '12.5px', color: '#334155', fontWeight: '500' }}>
+              <span style={{ color: '#3b82f6', flexShrink: 0, fontWeight: '700' }}>{i + 1}.</span>
               <span>{a}</span>
             </div>
           ))}
         </div>
 
         {/* Action buttons */}
-        <div style={{ marginTop: '20px', display: 'flex', gap: '10px', paddingTop: '14px', borderTop: '1px solid #1e293b' }}>
+        <div style={{ marginTop: '20px', display: 'flex', gap: '10px', paddingTop: '14px', borderTop: '1px solid #f1f5f9' }}>
           {!dispatched ? (
-            <button className="btn btn-danger" style={{ flex: 1 }}
+            <button className="btn btn-danger" style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontWeight: '600' }}
               onClick={() => setDispatched(true)}>
-              🚔 Dispatch Inspector to Site
+              <Activity size={14} />
+              <span>Dispatch Inspector</span>
             </button>
           ) : (
-            <div style={{ flex: 1, padding: '8px 16px', background: 'rgba(34,197,94,0.15)',
-              border: '1px solid rgba(34,197,94,0.4)', borderRadius: '8px', color: '#4ade80',
-              fontSize: '13px', fontWeight: '700', textAlign: 'center' }}>
-              ✅ Inspector Dispatched
+            <div style={{ flex: 1, padding: '8px 16px', background: 'rgba(34,197,94,0.1)',
+              border: '1px solid rgba(34,197,94,0.3)', borderRadius: '8px', color: '#16a34a',
+              fontSize: '13px', fontWeight: '700', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+              <CheckCircle size={14} />
+              <span>Inspector Dispatched</span>
             </div>
           )}
           <a href={`https://maps.google.com/?q=${data.location[0]},${data.location[1]}`}
             target="_blank" rel="noopener noreferrer"
-            className="btn btn-outline" style={{ flexShrink: 0 }}>
-            🗺️ Open in Maps
+            className="btn btn-outline" style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none', fontWeight: '600' }}>
+            <Navigation size={13} />
+            <span>Open in Maps</span>
           </a>
-          <button className="btn btn-outline" onClick={onClose} style={{ flexShrink: 0 }}>Close</button>
+          <button className="btn btn-outline" onClick={onClose} style={{ flexShrink: 0, fontWeight: '600' }}>Close</button>
         </div>
       </div>
     </div>
