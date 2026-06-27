@@ -2135,12 +2135,9 @@ function CitizensAdvisoryPopup({ state, advisory, lang, onChangeLang, selectedWa
     else if (lang === 'ta') langCode = 'ta-IN'
     else if (lang === 'te') langCode = 'te-IN'
 
-    // Look for local voice matching chosen language
-    const match = voices.find(v => v.lang.toLowerCase().replace('_', '-').startsWith(langCode.substring(0, 2).toLowerCase()))
-    
-    if (lang !== 'en' && !match) {
-      // Fallback: Google Translate TTS cloud audio stream
-      console.log(`No native voice found for ${langCode} locally. Falling back to Google Translate cloud TTS.`)
+    if (lang !== 'en') {
+      // Force Google Translate TTS cloud audio stream for all non-English languages
+      console.log(`Using Google Translate cloud TTS: ${langCode}`)
       const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${langCode}&client=tw-ob&q=${encodeURIComponent(textToRead)}`
       
       const audio = new Audio(url)
@@ -2151,7 +2148,7 @@ function CitizensAdvisoryPopup({ state, advisory, lang, onChangeLang, selectedWa
       setIsSpeaking(true)
       audio.play().catch(err => {
         console.error("Cloud Audio playback failed, falling back to local synthesis:", err)
-        // Fall back to synthesis anyway
+        // Fallback to local synthesis anyway
         const utterance = new SpeechSynthesisUtterance(textToRead)
         utterance.lang = langCode
         utterance.onend = () => setIsSpeaking(false)
@@ -2159,12 +2156,12 @@ function CitizensAdvisoryPopup({ state, advisory, lang, onChangeLang, selectedWa
         window.speechSynthesis.speak(utterance)
       })
     } else {
-      // Standard SpeechSynthesis
+      // Standard SpeechSynthesis for English
       const utterance = new SpeechSynthesisUtterance(textToRead)
       utterance.lang = langCode
+      const match = voices.find(v => v.lang.toLowerCase().replace('_', '-').startsWith('en'))
       if (match) {
         utterance.voice = match
-        console.log(`Using native voice: ${match.name}`)
       }
       utterance.onend = () => setIsSpeaking(false)
       utterance.onerror = () => setIsSpeaking(false)
