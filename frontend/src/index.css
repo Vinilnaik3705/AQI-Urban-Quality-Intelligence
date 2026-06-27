@@ -462,3 +462,283 @@ body{
   cursor:pointer;transition:var(--ease);display:flex;align-items:center;justify-content:center;
 }
 .modal-close:hover{background:var(--danger);color:#fff}
+
+/* ── Geothermal Map & Maximize Styles ─────────────────────────────────────── */
+.geothermal-map .leaflet-tile-container {
+  filter: sepia(100%) saturate(160%) hue-rotate(-10deg) contrast(95%) brightness(90%);
+}
+
+.map-right-controls {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 12px;
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  width: 170px;
+}
+.map-controls-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.map-controls-title {
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+.map-control-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-radius: 20px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--ease);
+}
+.map-control-btn:hover {
+  background: #f8fafc;
+}
+.map-control-btn.active {
+  background: #3b82f6;
+  color: #ffffff;
+  border-color: #3b82f6;
+}
+
+.map-maximize-btn {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 1000;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 8px;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--ease);
+}
+.map-maximize-btn:hover {
+  background: #f8fafc;
+}
+
+/* ── City Ranking Panel ── */
+.rank-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  flex: 1;
+}
+.rank-list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: #ffffff;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: var(--ease);
+}
+.rank-list-row:hover {
+  background: #f8fafc;
+  transform: translateX(2px);
+}
+.rank-left-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.rank-num {
+  font-weight: 700;
+  color: var(--text-muted);
+  width: 16px;
+}
+.rank-badge {
+  padding: 4px 8px;
+  border-radius: var(--r-sm);
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+  min-width: 36px;
+  text-align: center;
+}
+
+/* ── Detailed City View Layout ── */
+.detailed-city-view {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  background: #f8fafc;
+  padding: 24px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--border);
+  margin-top: 16px;
+  width: 100%;
+}
+.detailed-hourly-title {
+  font-size: 16px;
+  font-weight: 750;
+  color: #0f172a;
+}
+.detailed-hourly-scroll {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+.hourly-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px;
+  background: #ffffff;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  min-width: 72px;
+  text-align: center;
+}
+.hourly-time {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.hourly-aqi {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #000000;
+}
+.hourly-temp {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.hourly-wind {
+  font-size: 9px;
+  color: var(--text-muted);
+}
+.hourly-humidity {
+  font-size: 9px;
+  color: #3b82f6;
+}
+
+.detailed-bottom-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+.daily-forecast-table-card {
+  background: #ffffff;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  padding: 16px;
+  box-shadow: var(--shadow);
+}
+.daily-forecast-title {
+  font-size: 15px;
+  font-weight: 750;
+  margin-bottom: 12px;
+  color: #0f172a;
+}
+.daily-row {
+  display: grid;
+  grid-template-columns: 80px 48px 48px 80px 48px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.daily-row:last-child {
+  border-bottom: none;
+}
+.daily-day {
+  font-weight: 600;
+}
+.daily-aqi-badge {
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.pollutants-recommendations-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.pollutants-card-detailed {
+  background: #ffffff;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  padding: 16px;
+  box-shadow: var(--shadow);
+}
+.who-comparison-warning {
+  background: #fff1f2;
+  border: 1px solid #ffe4e6;
+  border-radius: var(--r-sm);
+  padding: 10px;
+  color: #e11d48;
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.health-recs-card {
+  background: #ffffff;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  padding: 16px;
+  box-shadow: var(--shadow);
+}
+.health-rec-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 12px;
+}
+.health-rec-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid #f1f5f9;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: #f8fafc;
+}
+.health-rec-icon {
+  font-size: 20px;
+  margin-bottom: 4px;
+}
+

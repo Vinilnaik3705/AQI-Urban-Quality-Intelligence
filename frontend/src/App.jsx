@@ -636,6 +636,16 @@ function CommandCenter({ state, selectedWard, onSelectWard, mapStyle, setMapStyl
   const [showDropdown, setShowDropdown] = useState(false)
   const dropdownRef = useRef(null)
 
+  // Maximize / Ranking List Toggle
+  const [isMaximized, setIsMaximized] = useState(true)
+
+  // Floating Map Overlays State
+  const [showStations, setShowStations] = useState(true)
+  const [showFires, setShowFires] = useState(false)
+  const [showWind, setShowWind] = useState(true)
+  const [showFacilities, setShowFacilities] = useState(false)
+  const [showIndoor, setShowIndoor] = useState(false)
+
   useEffect(() => {
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -693,7 +703,6 @@ function CommandCenter({ state, selectedWard, onSelectWard, mapStyle, setMapStyl
   if (selectedWard?.pollutants) {
     pm25 = selectedWard.pollutants.pm25;
   } else if (state.sensors.length > 0) {
-    // Average PM2.5 across active sensors
     const sensorsWithPm = state.sensors.filter(s => s.pollutants?.pm25 != null);
     if (sensorsWithPm.length > 0) {
       pm25 = sensorsWithPm.reduce((s, r) => s + r.pollutants.pm25, 0) / sensorsWithPm.length;
@@ -704,106 +713,210 @@ function CommandCenter({ state, selectedWard, onSelectWard, mapStyle, setMapStyl
   const trendAqi = selectedWard?.aqi_in ?? selectedWard?.current_aqi ?? Math.round(state.sensors.reduce((s, r) => s + (r.aqi_in ?? r.aqi), 0) / state.sensors.length);
   const selectedCityName = selectedWard?.name ?? state.city.name;
 
+  // Ranking List Generation
+  const rankedCities = state.wards.map(w => {
+    const s = state.sensors.find(sensor => sensor.ward_id === w.id);
+    const aqi = s ? (s.aqi_in ?? s.aqi) : (w.aqi_in ?? w.current_aqi ?? 50);
+    return {
+      ...w,
+      aqi: Math.round(aqi)
+    };
+  }).sort((a, b) => b.aqi - a.aqi);
+
+  const getFlagEmoji = (countryName) => {
+    if (!countryName) return '🇮🇳';
+    const c = countryName.toLowerCase();
+    if (c.includes('uganda')) return '🇺🇬';
+    if (c.includes('indonesia')) return '🇮🇩';
+    if (c.includes('congo')) return '🇨🇩';
+    if (c.includes('pakistan')) return '🇵🇰';
+    if (c.includes('china')) return '🇨🇳';
+    return '🇮🇳';
+  };
+
+  // Helper for geothermal heatmap colors
+  const getGeothermalColor = (aqi) => {
+    const ratio = Math.min(1, aqi / 300);
+    const r = Math.round(ratio * 255);
+    const g = Math.round((1 - ratio) * 200);
+    return `rgb(${r}, ${g}, 0)`;
+  };
+
+  // Simulated Hourly Forecast
+  const hourlyTimes = ['Now', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00', 'Sun', '00:00', '01:00', '02:00', '03:00', '04:00', '05:00', '06:00', '07:00', '08:00'];
+  const hourlyForecastData = hourlyTimes.map((time, idx) => {
+    const multiplier = 1 + 0.1 * Math.sin(idx / 2);
+    const hourlyAqi = Math.round(trendAqi * multiplier);
+    return {
+      time,
+      aqi: hourlyAqi,
+      temp: Math.round(temp + 2 * Math.cos(idx / 3)),
+      wind: Math.round(windKmh + Math.sin(idx)),
+      humidity: Math.round(humidity + idx % 4)
+    };
+  });
+
+  // Simulated 7-day forecast
+  const days = ['Today', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  const dailyForecastData = days.map((day, idx) => {
+    const multiplier = 1 - 0.05 * idx;
+    const dailyAqi = Math.round(trendAqi * multiplier);
+    return {
+      day,
+      aqi: dailyAqi,
+      tempMax: Math.round(temp + 1),
+      tempMin: Math.round(temp - 5),
+      wind: Math.round(windKmh - (idx % 2)),
+      humidity: Math.round(humidity + (idx % 3))
+    };
+  });
+
   return (
-    <div className="content-area" style={{ display: 'flex', flexDirection: 'row', gap: '24px', flex: 1, overflow: 'hidden' }}>
-      <div className="iqair-layout-grid">
+    <>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%', overflowY: 'auto' }}>
+      <div className="iqair-layout-grid" style={{ minHeight: '520px' }}>
         {/* Left Column */}
         <div className="iqair-left-panel">
-          {/* Search box */}
-          <div className="iqair-search-box" ref={dropdownRef}>
-            <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: '12px', pointerEvents: 'none' }} />
-            <input
-              type="text"
-              className="iqair-search-input"
-              placeholder="Your country, city or location..."
-              value={query}
-              onFocus={() => { if (results.length) setShowDropdown(true) }}
-              onChange={e => handleSearch(e.target.value)}
-            />
-            {showDropdown && results.length > 0 && (
-              <div
-                className="map-search-results"
-                onMouseDown={e => e.stopPropagation()}
-                onClick={e => e.stopPropagation()}
-                style={{ position: 'absolute', top: '44px', left: 0, width: '100%', zIndex: 9999, background: '#ffffff', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)' }}
-              >
-                {results.map((r, i) => (
-                  <div
-                    key={i}
-                    className="map-search-result-row"
-                    onClick={(e) => { e.stopPropagation(); selectItem(r); }}
-                    style={{ padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}
+          {isMaximized ? (
+            /* City Ranking Panel */
+            <>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <h2 style={{ fontSize: '18px', fontWeight: '850', color: '#0f172a' }}>Live AQI global major city ranking</h2>
+                  <span style={{ cursor: 'pointer', color: '#64748b' }} title="Real-time air quality index">ⓘ</span>
+                </div>
+                <div style={{ fontSize: '11px', color: '#64748b' }}>
+                  {new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })} {new Date().getHours()}:00-{new Date().getHours() + 1}:00
+                </div>
+              </div>
+
+              <div className="rank-list-container">
+                {rankedCities.map((city, idx) => (
+                  <div 
+                    key={city.id} 
+                    className="rank-list-row"
+                    onClick={() => onSelectWard(city)}
                   >
-                    <MapPin size={11} color="#4a6080" />
-                    <span>
-                      <strong>{r.name}</strong>
-                      {r.admin1 && `, ${r.admin1}`}
-                      {r.country && ` (${r.country})`}
-                    </span>
+                    <div className="rank-left-info">
+                      <span className="rank-num">{idx + 1}</span>
+                      <span>{getFlagEmoji(city.country)}</span>
+                      <span>{city.name}</span>
+                    </div>
+                    <div className="rank-badge" style={{ backgroundColor: aqiColor(city.aqi), color: getAqiTextColor(city.aqi) }}>
+                      {city.aqi}
+                    </div>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
 
-          <div className="city-aqi-header-title">
-            {selectedCityName} air quality index (AQI)
-          </div>
-
-          {/* Highlight AQI Card */}
-          <div 
-            className="iqair-aqi-card" 
-            style={{ 
-              backgroundColor: aqiColor(trendAqi), 
-              color: getAqiTextColor(trendAqi) 
-            }}
-          >
-            <div className="aqi-card-top">
-              <div className="aqi-card-number-box">
-                <span className="aqi-card-num" style={{ color: '#0f172a' }}>
-                  {Math.round(trendAqi)}
-                </span>
-                <span className="aqi-card-unit">US AQI</span>
+              <button 
+                className="btn btn-primary" 
+                style={{ width: '100%', padding: '12px', borderRadius: '8px', fontSize: '13px', fontWeight: '700', backgroundColor: '#3b82f6' }}
+                onClick={() => setTab('forecast')}
+              >
+                See full ranking →
+              </button>
+            </>
+          ) : (
+            /* Normal Left Panel (Search / Highlight Card) */
+            <>
+              {/* Search box */}
+              <div className="iqair-search-box" ref={dropdownRef}>
+                <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: '12px', pointerEvents: 'none' }} />
+                <input
+                  type="text"
+                  className="iqair-search-input"
+                  placeholder="Your country, city or location..."
+                  value={query}
+                  onFocus={() => { if (results.length) setShowDropdown(true) }}
+                  onChange={e => handleSearch(e.target.value)}
+                />
+                {showDropdown && results.length > 0 && (
+                  <div
+                    className="map-search-results"
+                    onMouseDown={e => e.stopPropagation()}
+                    onClick={e => e.stopPropagation()}
+                    style={{ position: 'absolute', top: '44px', left: 0, width: '100%', zIndex: 9999, background: '#ffffff', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)' }}
+                  >
+                    {results.map((r, i) => (
+                      <div
+                        key={i}
+                        className="map-search-result-row"
+                        onClick={(e) => { e.stopPropagation(); selectItem(r); }}
+                        style={{ padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}
+                      >
+                        <MapPin size={11} color="#4a6080" />
+                        <span>
+                          <strong>{r.name}</strong>
+                          {r.admin1 && `, ${r.admin1}`}
+                          {r.country && ` (${r.country})`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-              <div className="aqi-card-status-text">
-                {aqiLevel(trendAqi).replace('_', ' ').toUpperCase()}
+
+              <div className="city-aqi-header-title">
+                {selectedCityName} air quality index (AQI)
               </div>
-              <div className="aqi-card-face-icon">
-                {(() => {
-                  const level = aqiLevel(trendAqi);
-                  if (level === 'good') return '😊';
-                  if (level === 'satisfactory') return '🙂';
-                  if (level === 'moderate') return '😐';
-                  if (level === 'poor') return '😷';
-                  if (level === 'very_poor') return '🤢';
-                  return '💀';
-                })()}
+
+              {/* Highlight AQI Card */}
+              <div 
+                className="iqair-aqi-card" 
+                style={{ 
+                  backgroundColor: aqiColor(trendAqi), 
+                  color: getAqiTextColor(trendAqi) 
+                }}
+              >
+                <div className="aqi-card-top">
+                  <div className="aqi-card-number-box">
+                    <span className="aqi-card-num" style={{ color: '#0f172a' }}>
+                      {Math.round(trendAqi)}
+                    </span>
+                    <span className="aqi-card-unit">US AQI</span>
+                  </div>
+                  <div className="aqi-card-status-text">
+                    {aqiLevel(trendAqi).replace('_', ' ').toUpperCase()}
+                  </div>
+                  <div className="aqi-card-face-icon">
+                    {(() => {
+                      const level = aqiLevel(trendAqi);
+                      if (level === 'good') return '😊';
+                      if (level === 'satisfactory') return '🙂';
+                      if (level === 'moderate') return '😐';
+                      if (level === 'poor') return '😷';
+                      if (level === 'very_poor') return '🤢';
+                      return '💀';
+                    })()}
+                  </div>
+                </div>
+
+                <div className="aqi-card-divider" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }} />
+                
+                <div className="aqi-card-pollutant-row" style={{ color: getAqiTextColor(trendAqi) }}>
+                  <span>Main pollutant</span>
+                  <strong>PM2.5 | {pm25} µg/m³</strong>
+                </div>
+
+                <div className="aqi-card-divider" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }} />
+
+                <div className="aqi-card-weather-strip">
+                  <span className="weather-strip-item">🌡️ {Math.round(temp)}°C</span>
+                  <span className="weather-strip-item">💨 {windKmh.toFixed(1)} km/h</span>
+                  <span className="weather-strip-item">💧 {humidity}%</span>
+                </div>
               </div>
-            </div>
 
-            <div className="aqi-card-divider" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }} />
-            
-            <div className="aqi-card-pollutant-row" style={{ color: getAqiTextColor(trendAqi) }}>
-              <span>Main pollutant</span>
-              <strong>PM2.5 | {pm25} µg/m³</strong>
-            </div>
-
-            <div className="aqi-card-divider" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }} />
-
-            <div className="aqi-card-weather-strip">
-              <span className="weather-strip-item">🌡️ {Math.round(temp)}°C</span>
-              <span className="weather-strip-item">💨 {windKmh.toFixed(1)} km/h</span>
-              <span className="weather-strip-item">💧 {humidity}%</span>
-            </div>
-          </div>
-
-          <button className="forecast-btn-dark" onClick={() => setTab('forecast')}>
-            7-DAY FORECAST
-          </button>
+              <button className="forecast-btn-dark" onClick={() => setTab('forecast')}>
+                7-DAY FORECAST
+              </button>
+            </>
+          )}
         </div>
 
-        {/* Right Column (Map + Earth 3D overlay) */}
-        <div className="iqair-right-panel">
+        {/* Right Column (Maximized Map with Sepia Geothermal styling) */}
+        <div className="iqair-right-panel geothermal-map">
           <MapContainer
             center={state.city.center}
             zoom={5}
@@ -812,11 +925,36 @@ function CommandCenter({ state, selectedWard, onSelectWard, mapStyle, setMapStyl
             maxBoundsViscosity={1.0}
             scrollWheelZoom={true}
           >
-            <MapLayersControl />
             <ChangeMapView center={targetCenter} zoom={targetZoom} />
             
-            {/* Preset City Markers */}
+            {/* Custom XYZ TileLayer styled dynamically */}
+            <TileLayer
+              attribution="&copy; CARTO"
+              url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+              noWrap={true}
+            />
+
+            {/* Geothermal Heatmap circles */}
             {state.sensors.map(s => {
+              const aqiVal = s.aqi_in ?? s.aqi;
+              return (
+                <CircleMarker
+                  key={`heat-${s.sensor_id}`}
+                  center={s.location}
+                  radius={70}
+                  pathOptions={{
+                    fillColor: getGeothermalColor(aqiVal),
+                    fillOpacity: 0.16,
+                    color: 'transparent',
+                    weight: 0
+                  }}
+                  interactive={false}
+                />
+              )
+            })}
+
+            {/* Preset City Markers (Toggled by Stations) */}
+            {showStations && state.sensors.map(s => {
               const ward = state.wards.find(w => w.id === s.ward_id)
               const placeLabel = ward ? ward.name : s.sensor_id
               const aqiVal = s.aqi_in ?? s.aqi;
@@ -847,7 +985,7 @@ function CommandCenter({ state, selectedWard, onSelectWard, mapStyle, setMapStyl
             })}
 
             {/* Custom Searched Places */}
-            {customPlaces && customPlaces.map(cp => {
+            {showStations && customPlaces && customPlaces.map(cp => {
               const aqiVal = cp.aqi_in ?? cp.current_aqi;
               return (
                 <Marker
@@ -870,38 +1008,191 @@ function CommandCenter({ state, selectedWard, onSelectWard, mapStyle, setMapStyl
               )
             })}
 
-            {/* Emission Sources */}
-            {state.sources && state.sources.map(src => (
-              <CircleMarker
-                key={src.id}
-                center={src.location}
-                radius={6}
+            {/* NASA Active Fires Layer (Toggled by Fires Overlay) */}
+            {showFires && (
+              <WMSTileLayer
+                url="https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi"
+                layers="VIIRS_SNPP_Thermal_Anomalies_375m_All,MODIS_Aqua_Thermal_Anomalies_All,MODIS_Terra_Thermal_Anomalies_All"
+                format="image/png"
+                transparent={true}
+                attribution="NASA GIBS / FIRMS"
+                noWrap={true}
+              />
+            )}
+
+            {/* Simulated Wind Stream Polyline Overlay */}
+            {showWind && (
+              <Polyline
+                positions={[
+                  [[17.3, 78.4], [17.8, 79.1]],
+                  [[17.5, 78.2], [18.0, 78.9]],
+                  [[12.9, 77.5], [13.4, 78.1]],
+                  [[28.6, 77.2], [29.1, 77.8]],
+                  [[13.0, 80.2], [13.5, 80.8]],
+                  [[19.0, 72.8], [19.5, 73.4]]
+                ]}
                 pathOptions={{
-                  fillColor: SOURCE_COLORS[src.category] || '#888',
-                  fillOpacity: 0.9,
-                  color: '#fff',
-                  weight: 1,
+                  color: '#ffffff',
+                  weight: 1.5,
+                  dashArray: '8, 12',
+                  opacity: 0.6
                 }}
-              >
-                <Popup>
-                  <EmissionSourcePopup src={src} />
-                </Popup>
-              </CircleMarker>
-            ))}
+              />
+            )}
           </MapContainer>
 
-          {/* Earth 3D map overlay */}
-          <div className="earth-3d-overlay">
-            <div className="earth-3d-bg">
-              <div className="earth-3d-globe"></div>
-              <div className="earth-3d-title">3D Map</div>
-              <div className="earth-3d-logo">IQAir Earth</div>
+          {/* Floating Maximize/Minimize Toggle button */}
+          <button 
+            className="map-maximize-btn" 
+            onClick={() => setIsMaximized(!isMaximized)}
+            title={isMaximized ? "Restore view" : "Maximize ranking map"}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              {isMaximized ? (
+                <>
+                  <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M10 14l-7 7" />
+                </>
+              ) : (
+                <>
+                  <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                </>
+              )}
+            </svg>
+          </button>
+
+          {/* Floating Controls Overlay (Right Panel on Map) */}
+          <div className="map-right-controls">
+            <div className="map-controls-group">
+              <span className="map-controls-title">Outdoor</span>
+              <button className={`map-control-btn ${showStations ? 'active' : ''}`} onClick={() => setShowStations(!showStations)}>
+                <span>Air quality stations</span>
+                <span>{showStations ? '✓' : ''}</span>
+              </button>
+              <button className={`map-control-btn ${showFires ? 'active' : ''}`} onClick={() => setShowFires(!showFires)}>
+                <span>Fires</span>
+                <span>{showFires ? '✓' : ''}</span>
+              </button>
+              <button className={`map-control-btn ${showWind ? 'active' : ''}`} onClick={() => setShowWind(!showWind)}>
+                <span>Wind</span>
+                <span>{showWind ? '✓' : ''}</span>
+              </button>
+            </div>
+            
+            <div className="map-controls-group" style={{ marginTop: '4px' }}>
+              <span className="map-controls-title">Indoor</span>
+              <button className={`map-control-btn ${showFacilities ? 'active' : ''}`} onClick={() => setShowFacilities(!showFacilities)}>
+                <span>Clean Air Facilities</span>
+                <span>{showFacilities ? '✓' : ''}</span>
+              </button>
+              <button className={`map-control-btn ${showIndoor ? 'active' : ''}`} onClick={() => setShowIndoor(!showIndoor)}>
+                <span>Indoor Sensors</span>
+                <span>{showIndoor ? '✓' : ''}</span>
+              </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Right Details Panel (Preserved) */}
+      {/* ── Detailed City View (Hourly, Daily, Pollutants & Recommendations) ── */}
+      {selectedWard && (
+        <div className="detailed-city-view">
+          <div>
+            <h3 className="detailed-hourly-title">Hourly weather & air quality forecast for {selectedCityName}</h3>
+            <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', marginBottom: '12px' }}>
+              Projections for the next 24 hours based on localized atmospheric modeling.
+            </div>
+            <div className="detailed-hourly-scroll">
+              {hourlyForecastData.map((item, idx) => (
+                <div key={idx} className="hourly-card">
+                  <span className="hourly-time">{item.time}</span>
+                  <span className="hourly-aqi" style={{ backgroundColor: aqiColor(item.aqi) }}>
+                    {item.aqi}
+                  </span>
+                  <span style={{ fontSize: '16px' }}>
+                    {item.aqi <= 100 ? '☀️' : item.aqi <= 200 ? '⛅' : '🌫️'}
+                  </span>
+                  <span className="hourly-temp">{item.temp}°</span>
+                  <span className="hourly-wind">💨 {item.wind} km/h</span>
+                  <span className="hourly-humidity">💧 {item.humidity}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="detailed-bottom-layout">
+            {/* Daily Forecast Card */}
+            <div className="daily-forecast-table-card">
+              <h4 className="daily-forecast-title">7-Day Air Quality & Weather Forecast</h4>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {dailyForecastData.map((item, idx) => (
+                  <div key={idx} className="daily-row">
+                    <span className="daily-day">{item.day}</span>
+                    <span className="daily-aqi-badge" style={{ backgroundColor: aqiColor(item.aqi), color: getAqiTextColor(item.aqi) }}>
+                      {item.aqi}
+                    </span>
+                    <span style={{ fontSize: '14px', textAlign: 'center' }}>
+                      {item.aqi <= 100 ? '☀️' : item.aqi <= 200 ? '⛅' : '🌫️'}
+                    </span>
+                    <span style={{ fontWeight: '600', color: '#0f172a', textAlign: 'center' }}>
+                      {item.tempMax}° <span style={{ color: '#94a3b8', fontWeight: '400' }}>{item.tempMin}°</span>
+                    </span>
+                    <span style={{ fontSize: '11px', color: '#64748b' }}>💨 {item.wind} km/h</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Pollutants & Recommendations Column */}
+            <div className="pollutants-recommendations-col">
+              {/* Pollutants card */}
+              <div className="pollutants-card-detailed">
+                <h4 style={{ fontSize: '15px', fontWeight: '750', marginBottom: '10px', color: '#0f172a' }}>Air pollutants breakdown</h4>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                  <div>
+                    <strong style={{ fontSize: '13px', color: '#334155' }}>PM2.5</strong>
+                    <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>Fine particles (≤ 2.5 µg/m³)</div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: aqiColor(trendAqi) }} />
+                    <strong style={{ fontSize: '16px', color: '#0f172a' }}>{pm25} µg/m³</strong>
+                  </div>
+                </div>
+                
+                <div className="who-comparison-warning">
+                  <span>⚠️</span>
+                  <span>
+                    PM2.5 concentration in {selectedCityName} is currently {Math.max(1, Math.round(pm25 / 5))} times the WHO annual air quality guideline value.
+                  </span>
+                </div>
+              </div>
+
+              {/* Health Recommendations Card */}
+              <div className="health-recs-card">
+                <h4 style={{ fontSize: '15px', fontWeight: '750', color: '#0f172a' }}>Health recommendations</h4>
+                <div className="health-rec-list">
+                  <div className="health-rec-item">
+                    <span className="health-rec-icon">🚫</span>
+                    <span>Avoid outdoor exercise</span>
+                  </div>
+                  <div className="health-rec-item">
+                    <span className="health-rec-icon">🪟</span>
+                    <span>Close windows to avoid dirty air</span>
+                  </div>
+                  <div className="health-rec-item">
+                    <span className="health-rec-icon">😷</span>
+                    <span>Wear a mask outdoors</span>
+                  </div>
+                  <div className="health-rec-item">
+                    <span className="health-rec-icon">🌀</span>
+                    <span>Run an air purifier</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      </div>
       <div className="right-panel">
         {selectedWard ? (
           <div className="card" style={{ padding: '20px', background: '#ffffff', borderRadius: '12px', border: '1px solid var(--border)', minHeight: '400px' }}>
@@ -1043,7 +1334,7 @@ function CommandCenter({ state, selectedWard, onSelectWard, mapStyle, setMapStyl
           </div>
         )}
       </div>
-    </div>
+    </>
   );
 }
 
