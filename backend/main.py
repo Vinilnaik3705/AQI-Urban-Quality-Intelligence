@@ -14,12 +14,15 @@ if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 import os
+import sqlite3
+import uuid
+from typing import Optional
 from datetime import datetime, timezone
 import httpx
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 
 from simulation import SimulationEngine, CITIES, DEFAULT_CITY, get_sources_for_city
 from agents import (
@@ -29,6 +32,40 @@ from agents import (
     AdvisoryAgent,
 )
 from forecaster import AQIForecaster
+
+# ── Database Initialization ──────────────────────────────────────────────────
+
+def init_db():
+    db_path = os.path.join(os.path.dirname(__file__), "subscriptions.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS aqi_subscriptions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ward_id TEXT NOT NULL,
+            profile TEXT NOT NULL,
+            email TEXT NOT NULL,
+            confirm_token TEXT UNIQUE,
+            confirmed INTEGER DEFAULT 0,
+            last_alerted_aqi REAL DEFAULT 0.0,
+            created_at TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+
+def _get_resend_key_from_env_file() -> Optional[str]:
+    try:
+        env_path = os.path.join(os.path.dirname(__file__), "../.env")
+        if os.path.exists(env_path):
+            with open(env_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    if line.strip().startswith("RESEND_API_KEY="):
+                        return line.strip().split("=", 1)[1].strip()
+    except Exception:
+        pass
+    return None
 
 # ── Application Setup ─────────────────────────────────────────────────────────
 
@@ -57,17 +94,16 @@ forecaster = AQIForecaster()
 
 @app.on_event("startup")
 async def startup_event():
-    # Pre-train ALL live cities in the background — each city uses its own lat/lng so
-    # models are genuinely city-specific (different historical pollution + weather patterns).
+    # Initialize local SQLite DB
+    init_db()
+
+    # Pre-train ALL live cities in the background
     from simulation import LIVE_CITIES
-    # Only train top-level cities (not ward sub-localities) to keep startup fast.
-    # Ward sub-localities share coordinates close to parent city, so parent model is representative.
     PARENT_CITIES = [k for k in LIVE_CITIES if "_" not in k]
 
     async def train_all():
         import logging
         log = logging.getLogger("main")
-        # Train in small concurrent batches so startup isn't serialized
         batch_size = 5
         for i in range(0, len(PARENT_CITIES), batch_size):
             batch = PARENT_CITIES[i:i + batch_size]
@@ -77,6 +113,21 @@ async def startup_event():
                 if isinstance(res, Exception):
                     log.error(f"Error training startup model for {city}: {res}")
     asyncio.create_task(train_all())
+
+    # Start the background alert loop
+    async def alert_loop():
+        # Check environment variable or load default (3600 seconds)
+        interval = int(os.environ.get("ALERT_LOOP_INTERVAL", "3600"))
+        print(f"Starting alert background loop with interval {interval}s")
+        await asyncio.sleep(10)  # Wait for startup to stabilize
+        while True:
+            try:
+                await send_aqi_alerts()
+            except Exception as e:
+                print("Error in alert loop:", e)
+            await asyncio.sleep(interval)
+
+    asyncio.create_task(alert_loop())
 
 
 
@@ -538,30 +589,179 @@ async def run_advisory(
     )
 
 
-ACTIVE_SUBSCRIPTIONS = {}
+# ── Email Alert Subscriptions (SQLite + Resend) ──────────────────────────────
 
 @app.post("/api/advisory/subscribe")
 async def subscribe_advisory(
     ward_id: str = Query(...),
     profile: str = Query(default="healthy_adult"),
-    channel: str = Query(default="none"),
-    lang: str = Query(default="en"),
-    phone: str = Query(default=""),
-    email: str = Query(default=""),
+    email: str = Query(...),
 ):
-    """Register a public health advisory alert subscription."""
-    sub_key = f"{ward_id}_{profile}_{channel}_{phone}_{email}"
-    ACTIVE_SUBSCRIPTIONS[sub_key] = {
-        "ward_id": ward_id,
-        "profile": profile,
-        "channel": channel,
-        "lang": lang,
-        "phone": phone,
-        "email": email,
-        "subscribed_at": datetime.now(timezone.utc).isoformat()
+    """Register a public health advisory alert subscription (double opt-in)."""
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="Invalid email address.")
+
+    db_path = os.path.join(os.path.dirname(__file__), "subscriptions.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Check for duplicates
+    cursor.execute(
+        "SELECT id FROM aqi_subscriptions WHERE email = ? AND ward_id = ?",
+        (email, ward_id)
+    )
+    if cursor.fetchone():
+        conn.close()
+        return {"status": "success", "message": "Already subscribed for this location."}
+
+    # Insert unconfirmed subscription
+    token = str(uuid.uuid4())
+    cursor.execute(
+        "INSERT INTO aqi_subscriptions (ward_id, profile, email, confirm_token, confirmed, created_at) VALUES (?, ?, ?, ?, 0, ?)",
+        (ward_id, profile, email, token, datetime.now(timezone.utc).isoformat())
+    )
+    conn.commit()
+    conn.close()
+
+    # Send confirmation email
+    city_name = CITIES.get(ward_id, {}).get("name", ward_id.capitalize())
+    # Generate relative confirmation link for the browser client to target
+    confirm_url = f"/api/advisory/confirm?token={token}"
+    
+    # Check for Resend API key
+    resend_key = os.environ.get("RESEND_API_KEY") or _get_resend_key_from_env_file()
+    subject = f"Confirm your AQI alert subscription for {city_name}"
+    from_email = os.environ.get("RESEND_FROM_EMAIL") or "AQI Alerts <onboarding@resend.dev>"
+    
+    html_body = f"""
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #1e293b;">
+            <h2 style="color: #3b82f6;">Confirm Your Subscription</h2>
+            <p>You requested to receive air quality alerts for <strong>{city_name}</strong> (Profile: {profile.replace('_', ' ').capitalize()}).</p>
+            <p>Please click the button below to confirm your subscription:</p>
+            <div style="margin: 24px 0;">
+                <a href="{confirm_url}" style="background-color: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold;">Confirm Subscription</a>
+            </div>
+            <p style="font-size: 13px; color: #64748b;">If you didn't request this alert, please ignore this email.</p>
+        </div>
+    """
+
+    if resend_key:
+        try:
+            import resend
+            resend.api_key = resend_key
+            resend.Emails.send({
+                "from": from_email,
+                "to": email,
+                "subject": subject,
+                "html": html_body
+            })
+            print(f"Confirmation email successfully sent to {email}")
+        except Exception as e:
+            print("Resend failed to send confirmation:", e)
+    else:
+        # Development Console simulation fallback
+        print(f"[CONSOLE EMAIL SIMULATION] To: {email} | Subject: {subject} | Confirm Link: {confirm_url}")
+
+    return {"status": "success", "message": "Verification email sent. Please check your inbox to confirm."}
+
+
+@app.get("/api/advisory/confirm")
+async def confirm_advisory(token: str):
+    """Verify double opt-in email subscription and activate it."""
+    db_path = os.path.join(os.path.dirname(__file__), "subscriptions.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT id FROM aqi_subscriptions WHERE confirm_token = ?", (token,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Invalid or expired verification token.")
+
+    cursor.execute("UPDATE aqi_subscriptions SET confirmed = 1 WHERE confirm_token = ?", (token,))
+    conn.commit()
+    conn.close()
+
+    # Redirect user back to frontend with a success flag
+    return RedirectResponse("/?alert=confirmed")
+
+
+async def send_aqi_alerts():
+    """Query confirmed subscriptions, fetch current AQI, and send alert emails if threshold exceeded."""
+    db_path = os.path.join(os.path.dirname(__file__), "subscriptions.db")
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM aqi_subscriptions WHERE confirmed = 1")
+    rows = cursor.fetchall()
+    conn.close()
+
+    if not rows:
+        return
+
+    print(f"Checking thresholds for {len(rows)} confirmed subscriptions...")
+    THRESHOLDS = {
+        "asthma": 50.0,
+        "sensitive": 100.0,
+        "elderly": 100.0,
+        "outdoor_worker": 100.0,
+        "healthy_adult": 150.0
     }
-    print(f"Registered subscription: {ACTIVE_SUBSCRIPTIONS[sub_key]}")
-    return {"status": "success", "message": f"Successfully subscribed to {channel} alerts."}
+
+    # Fetch latest simulation snapshot to get current AQI for each ward
+    readings = await sim.generate_readings("all")
+    ward_aqi_map = {r["ward_id"]: r["aqi"] for r in readings}
+
+    for row in rows:
+        ward_id = row["ward_id"]
+        profile = row["profile"]
+        email = row["email"]
+        last_alerted = row["last_alerted_aqi"]
+
+        current_aqi = ward_aqi_map.get(ward_id, 80.0)
+        threshold = THRESHOLDS.get(profile, 100.0)
+
+        # Alert if threshold is exceeded AND there is significant change (> 15.0 AQI difference)
+        if current_aqi > threshold and abs(current_aqi - last_alerted) > 15.0:
+            city_name = CITIES.get(ward_id, {}).get("name", ward_id.capitalize())
+            category = "Severe" if current_aqi > 300 else "Very Poor" if current_aqi > 200 else "Poor" if current_aqi > 150 else "Moderate" if current_aqi > 100 else "Satisfactory" if current_aqi > 50 else "Good"
+            
+            subject = f"⚠️ AQI Alert: {city_name} is {category} ({current_aqi:.1f})"
+            html_body = f"""
+                <div style="font-family: Arial, sans-serif; padding: 20px; color: #1e293b; border: 1px solid #e2e8f0; border-radius: 8px; max-width: 600px;">
+                    <h2 style="color: #ef4444; margin-top: 0;">⚠️ Air Quality Warning</h2>
+                    <p>The current air quality index in <strong>{city_name}</strong> has reached <strong>{current_aqi:.1f} ({category})</strong>.</p>
+                    <p>This exceeds your custom health profile safety threshold (<strong>{profile.replace('_', ' ').capitalize()}</strong> threshold: {threshold}).</p>
+                    <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+                    <p style="font-size: 13px; color: #64748b; margin-bottom: 0;">Please minimize prolonged outdoor exertion and take necessary health precautions.</p>
+                </div>
+            """
+
+            resend_key = os.environ.get("RESEND_API_KEY") or _get_resend_key_from_env_file()
+            from_email = os.environ.get("RESEND_FROM_EMAIL") or "AQI Alerts <onboarding@resend.dev>"
+            if resend_key:
+                try:
+                    import resend
+                    resend.api_key = resend_key
+                    resend.Emails.send({
+                        "from": from_email,
+                        "to": email,
+                        "subject": subject,
+                        "html": html_body
+                    })
+                    print(f"Alert email successfully sent to {email} for {city_name}")
+                except Exception as e:
+                    print(f"Resend failed to send alert email to {email}:", e)
+            else:
+                # Console simulation fallback
+                print(f"[CONSOLE EMAIL SIMULATION] Alert to: {email} | Subject: {subject}")
+
+            # Update database to avoid duplicate notifications in the next cycles
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            cursor.execute("UPDATE aqi_subscriptions SET last_alerted_aqi = ? WHERE id = ?", (current_aqi, row["id"]))
+            conn.commit()
+            conn.close()
 
 
 
