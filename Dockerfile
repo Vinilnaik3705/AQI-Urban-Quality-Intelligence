@@ -24,8 +24,8 @@ COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 # Copy backend files
 COPY backend ./backend
 
-# Copy .env for API keys (WAQI, OpenAQ, Resend)
-COPY .env ./.env
+# API keys (WAQI_TOKEN, OPENAQ_API_KEY, RESEND_API_KEY) are injected at runtime
+# via Hugging Face Spaces secrets — do NOT COPY .env into the image.
 
 # Hugging Face Spaces default port is 7860
 EXPOSE 7860
