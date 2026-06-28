@@ -26,7 +26,7 @@ import {
   Car, Hammer, Flame, Leaf, RefreshCw, Eye, FileText, Navigation,
   ChevronRight, Clock, Gauge, AlertCircle, CheckCircle, XCircle,
   Satellite, Building2, GraduationCap, Heart, ArrowUpRight,
-  Volume2, VolumeX, ExternalLink, Info, Radio, Phone
+  Volume2, VolumeX, ExternalLink, Info, Radio, Phone, Sun, Cloud
 } from 'lucide-react'
 
 ChartJS.register(
