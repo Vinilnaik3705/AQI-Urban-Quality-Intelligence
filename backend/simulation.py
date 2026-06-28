@@ -463,6 +463,12 @@ async def _fetch_real_aqi(lat: float, lng: float) -> Optional[Dict[str, Any]]:
                                         has_measurements = True
                             
                             if has_measurements:
+                                # Estimate missing PM values to prevent artificially low AQI
+                                if pollutants["pm25"] > 0.0 and pollutants["pm10"] == 0.0:
+                                    pollutants["pm10"] = pollutants["pm25"] * 1.8
+                                elif pollutants["pm10"] > 0.0 and pollutants["pm25"] == 0.0:
+                                    pollutants["pm25"] = pollutants["pm10"] * 0.55
+
                                 # Standardize CO to mg/m3
                                 if pollutants["co"] > 10.0:
                                     pollutants["co"] /= 1000.0
@@ -494,12 +500,18 @@ async def _fetch_real_aqi(lat: float, lng: float) -> Optional[Dict[str, Any]]:
             })
             if resp.status_code == 200:
                 data = resp.json().get("current", {})
-                pm25 = data.get("pm2_5", 0)
-                pm10 = data.get("pm10", 0)
-                no2 = data.get("nitrogen_dioxide", 0)
-                so2 = data.get("sulphur_dioxide", 0)
-                co = data.get("carbon_monoxide", 0) / 1000.0
-                o3 = data.get("ozone", 0)
+                raw_pm25 = data.get("pm2_5", 0)
+                raw_pm10 = data.get("pm10", 0)
+                factor = get_indian_seasonal_calibration(lat, lng)
+                gas_factor = max(0.5, factor) if factor < 1.0 else factor
+                
+                pm25 = raw_pm25 * factor
+                pm10 = raw_pm10 * factor
+                no2 = data.get("nitrogen_dioxide", 0) * gas_factor
+                so2 = data.get("sulphur_dioxide", 0) * gas_factor
+                co = (data.get("carbon_monoxide", 0) * gas_factor) / 1000.0
+                o3 = data.get("ozone", 0) * gas_factor
+                
                 aqi_val = calculate_indian_aqi(pm25, pm10, no2, so2, co, o3)
                 return {
                     "aqi": round(aqi_val, 1),
