@@ -26,7 +26,7 @@ import {
   Car, Hammer, Flame, Leaf, RefreshCw, Eye, FileText, Navigation,
   ChevronRight, Clock, Gauge, AlertCircle, CheckCircle, XCircle,
   Satellite, Building2, GraduationCap, Heart, ArrowUpRight,
-  Volume2, VolumeX, ExternalLink, Info, Radio, Phone, Sun, Cloud
+  Volume2, VolumeX, ExternalLink, Info, Radio, Phone, Sun, Cloud, CloudRain, Moon, CloudMoon
 } from 'lucide-react'
 
 ChartJS.register(
@@ -1161,13 +1161,16 @@ function CommandCenter({ state, selectedWard, onSelectWard, mapStyle, setMapStyl
   // Simulated Hourly Forecast (72 hours projection)
   const hourlyForecastData = Array.from({ length: 72 }).map((_, idx) => {
     let timeLabel = '';
+    const date = new Date();
+    date.setHours(date.getHours() + idx);
+    const hour = date.getHours();
+    const isNight = hour < 6 || hour > 18;
+
     if (idx === 0) {
       timeLabel = 'Now';
     } else {
-      const date = new Date();
-      date.setHours(date.getHours() + idx);
-      const hoursStr = String(date.getHours()).padStart(2, '0') + ':00';
-      if (date.getHours() === 0) {
+      const hoursStr = String(hour).padStart(2, '0') + ':00';
+      if (hour === 0) {
         timeLabel = date.toLocaleDateString('en-US', { weekday: 'short' });
       } else {
         timeLabel = hoursStr;
@@ -1175,12 +1178,24 @@ function CommandCenter({ state, selectedWard, onSelectWard, mapStyle, setMapStyl
     }
     const multiplier = 1 + 0.12 * Math.sin(idx / 5);
     const hourlyAqi = Math.round(trendAqi * multiplier);
+
+    // Simulate weather conditions that change with the timeline
+    let condition = 'sunny';
+    if (idx % 15 === 0) {
+      condition = 'rainy';
+    } else if (isNight) {
+      condition = idx % 2 === 0 ? 'night-cloudy' : 'clear-night';
+    } else if (idx % 5 === 0 || idx % 7 === 0) {
+      condition = 'cloudy';
+    }
+
     return {
       time: timeLabel,
       aqi: hourlyAqi,
       temp: Math.round(temp + 3 * Math.cos(idx / 6)),
       wind: Math.round(windKmh + Math.sin(idx / 2)),
-      humidity: Math.round(humidity + (idx % 6))
+      humidity: Math.round(humidity + (idx % 6)),
+      condition
     };
   });
 
@@ -1566,8 +1581,12 @@ function CommandCenter({ state, selectedWard, onSelectWard, mapStyle, setMapStyl
                   <span className="hourly-aqi" style={{ backgroundColor: aqiColor(item.aqi) }}>
                     {item.aqi}
                   </span>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {item.aqi <= 100 ? <Sun size={14} color="#eab308" /> : item.aqi <= 200 ? <Cloud size={14} color="#64748b" /> : <Wind size={14} color="#94a3b8" />}
+                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: '16px' }}>
+                    {item.condition === 'rainy' ? <CloudRain size={14} color="#3b82f6" /> :
+                     item.condition === 'clear-night' ? <Moon size={14} color="#a5f3fc" /> :
+                     item.condition === 'night-cloudy' ? <CloudMoon size={14} color="#94a3b8" /> :
+                     item.condition === 'cloudy' ? <Cloud size={14} color="#94a3b8" /> :
+                     <Sun size={14} color="#eab308" />}
                   </span>
                   <span className="hourly-temp">{item.temp}°</span>
                   <span className="hourly-wind"><Wind size={11} color="#64748b" style={{ marginRight: '3px', verticalAlign: 'middle' }} />{item.wind} km/h</span>
