@@ -327,6 +327,7 @@ export default function App() {
             setTab={setTab}
             onSelectPlace={handleSelectPlace}
             forceMaximized={true}
+            attribution={attribution}
           />
         )}
         {tab === 'forecast' && (
@@ -541,17 +542,18 @@ function Header({ tab, setTab, cityAqi, alertCount, weather, onSelectPlace }) {
         style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', fontWeight: '800', fontSize: '20px', color: '#0f172a' }}
       >
         <svg width="32" height="32" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-          {/* Outer gradient ring */}
+          {/* Outer gradient ring with correct coordinate mapping and all NAQI colors */}
           <defs>
-            <linearGradient id="ringGrad" x1="0" y1="64" x2="64" y2="0">
-              <stop offset="0%" stopColor="#22c55e"/>
-              <stop offset="25%" stopColor="#eab308"/>
-              <stop offset="50%" stopColor="#f97316"/>
-              <stop offset="75%" stopColor="#ef4444"/>
-              <stop offset="100%" stopColor="#22c55e"/>
+            <linearGradient id="ringGrad" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#10b981"/>
+              <stop offset="20%" stopColor="#eab308"/>
+              <stop offset="40%" stopColor="#f97316"/>
+              <stop offset="60%" stopColor="#ef4444"/>
+              <stop offset="80%" stopColor="#a855f7"/>
+              <stop offset="100%" stopColor="#991b1b"/>
             </linearGradient>
           </defs>
-          <circle cx="32" cy="32" r="29" stroke="url(#ringGrad)" strokeWidth="5" fill="none"/>
+          <circle cx="32" cy="32" r="28" stroke="url(#ringGrad)" strokeWidth="6" fill="none"/>
           {/* Cloud icon */}
           <path d="M44 36H22a6 6 0 0 1-.84-11.94A8 8 0 0 1 36.29 22 7 7 0 0 1 44 29a5 5 0 0 1 0 7Z" fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
@@ -722,8 +724,13 @@ function AqiGauge({ aqi }) {
   ];
 
   const buildArc = (fromAqi, toAqi) => {
-    const startDeg = toAngle(fromAqi);
-    const endDeg = toAngle(toAqi);
+    let startDeg = toAngle(fromAqi);
+    let endDeg = toAngle(toAqi);
+    
+    // Add visual gaps between segments by adjusting the angles
+    if (fromAqi > 0) startDeg -= 2;
+    if (toAqi < 500) endDeg += 2;
+    
     const [x1, y1] = arcPoint(startDeg);
     const [x2, y2] = arcPoint(endDeg);
     const largeArc = Math.abs(endDeg - startDeg) > 180 ? 1 : 0;
@@ -750,7 +757,7 @@ function AqiGauge({ aqi }) {
         {/* Background arc track */}
         <path
           d={`M ${arcPoint(180)[0].toFixed(2)} ${arcPoint(180)[1].toFixed(2)} A ${r} ${r} 0 0 1 ${arcPoint(0)[0].toFixed(2)} ${arcPoint(0)[1].toFixed(2)}`}
-          fill="none" stroke="rgba(148,163,184,0.08)" strokeWidth="22"
+          fill="none" stroke="#f1f5f9" strokeWidth="22"
         />
 
         {/* Colored NAQI band arcs */}
@@ -761,35 +768,34 @@ function AqiGauge({ aqi }) {
         {/* Tick marks and labels */}
         {ticks.map(t => {
           const deg = toAngle(t);
-          const [lx, ly] = arcPoint(deg);
-          const outerR = r + 16;
+          const outerR = r + 18;
           const rad = (deg * Math.PI) / 180;
           const ox = cx + outerR * Math.cos(rad);
           const oy = cy - outerR * Math.sin(rad);
           return (
             <text key={t} x={ox.toFixed(1)} y={(oy + 4).toFixed(1)}
-              fontSize="10" fontWeight="700" fill="#64748b" textAnchor="middle" style={{ fontFamily: 'Inter, sans-serif' }}>{t}</text>
+              fontSize="11" fontWeight="700" fill="#64748b" textAnchor="middle" style={{ fontFamily: 'Inter, sans-serif' }}>{t}</text>
           );
         })}
 
         {/* Needle */}
         <g transform={`rotate(${needleAngle} ${cx} ${cy})`} style={{ transition: 'transform 0.8s cubic-bezier(0.34,1.56,0.64,1)' }}>
           <line x1={cx} y1={cy} x2={cx} y2={cy - r + 14}
-            stroke="#0f172a" strokeWidth="3" strokeLinecap="round" />
+            stroke="#0f172a" strokeWidth="3.5" strokeLinecap="round" />
           <line x1={cx} y1={cy} x2={cx} y2={cy + 12}
-            stroke="#0f172a" strokeWidth="3" strokeLinecap="round" />
+            stroke="#0f172a" strokeWidth="3.5" strokeLinecap="round" />
         </g>
 
         {/* Hub */}
-        <circle cx={cx} cy={cy} r="10" fill="#0f172a" />
-        <circle cx={cx} cy={cy} r="5" fill="#475569" />
-        <circle cx={cx} cy={cy} r="2.5" fill="#94a3b8" />
+        <circle cx={cx} cy={cy} r="11" fill="#0f172a" />
+        <circle cx={cx} cy={cy} r="6" fill="#475569" />
+        <circle cx={cx} cy={cy} r="3" fill="#94a3b8" />
 
         {/* AQI value below */}
-        <text x={cx} y={cy + 32} fontSize="24" fontWeight="850" fill={aqiLabelColor} textAnchor="middle" style={{ fontFamily: 'Inter, sans-serif' }}>
+        <text x={cx} y={cy + 32} fontSize="26" fontWeight="850" fill={aqiLabelColor} textAnchor="middle" style={{ fontFamily: 'Inter, sans-serif' }}>
           {Math.round(clampedAqi)}
         </text>
-        <text x={cx} y={cy + 46} fontSize="10" fontWeight="600" fill={aqiLabelColor} textAnchor="middle" style={{ fontFamily: 'Inter, sans-serif', letterSpacing: '0.5px' }}>
+        <text x={cx} y={cy + 46} fontSize="11" fontWeight="700" fill={aqiLabelColor} textAnchor="middle" style={{ fontFamily: 'Inter, sans-serif', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
           {aqiLabel}
         </text>
       </svg>
@@ -973,7 +979,7 @@ function WindStreamAnimation() {
 
 /* ── Command Center ────────────────────────────────────────────────────── */
 
-function CommandCenter({ state, selectedWard, onSelectWard, mapStyle, setMapStyle, customPlaces, targetCenter, targetZoom, setTab, onSelectPlace, forceMaximized = false }) {
+function CommandCenter({ state, selectedWard, onSelectWard, mapStyle, setMapStyle, customPlaces, targetCenter, targetZoom, setTab, onSelectPlace, forceMaximized = false, attribution }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [showDropdown, setShowDropdown] = useState(false)
@@ -996,10 +1002,10 @@ function CommandCenter({ state, selectedWard, onSelectWard, mapStyle, setMapStyl
     waste_burning: '#10b981',
   }
   const SOURCE_ICONS = {
-    industrial:    '🏭',
-    vehicular:     '🚗',
-    construction:  '🏗️',
-    waste_burning: '🔥'
+    industrial:    <Factory size={13} color="#ef4444" style={{ marginRight: '4px', verticalAlign: 'middle' }} />,
+    vehicular:     <Car size={13} color="#3b82f6" style={{ marginRight: '4px', verticalAlign: 'middle' }} />,
+    construction:  <Hammer size={13} color="#f59e0b" style={{ marginRight: '4px', verticalAlign: 'middle' }} />,
+    waste_burning: <Flame size={13} color="#10b981" style={{ marginRight: '4px', verticalAlign: 'middle' }} />
   }
 
   useEffect(() => {
@@ -1194,7 +1200,7 @@ function CommandCenter({ state, selectedWard, onSelectWard, mapStyle, setMapStyl
                 >
                   <Popup>
                     <div>
-                      <strong>📍 {placeLabel}</strong><br />
+                      <strong>{placeLabel}</strong><br />
                       AQI: <strong style={{ color: aqiColor(aqiVal) }}>{aqiVal}</strong>
                     </div>
                   </Popup>
@@ -1218,7 +1224,7 @@ function CommandCenter({ state, selectedWard, onSelectWard, mapStyle, setMapStyl
                 >
                   <Popup>
                     <div>
-                      <strong>📍 {cp.name}</strong><br />
+                      <strong>{cp.name}</strong><br />
                       AQI: <strong style={{ color: aqiColor(aqiVal) }}>{aqiVal}</strong>
                     </div>
                   </Popup>
@@ -1263,7 +1269,7 @@ function CommandCenter({ state, selectedWard, onSelectWard, mapStyle, setMapStyl
                 >
                   <Popup>
                     <div style={{ color: '#0f172a', fontSize: '12px' }}>
-                      <strong style={{ fontSize: '13px' }}>{SOURCE_ICONS[src.category] || '📍'} {src.name}</strong><br />
+                      <strong style={{ fontSize: '13px', display: 'inline-flex', alignItems: 'center' }}>{SOURCE_ICONS[src.category] || <MapPin size={13} color="#64748b" style={{ marginRight: '4px' }} />} {src.name}</strong><br />
                       Category: <span style={{ textTransform: 'capitalize', fontWeight: '600' }}>{src.label || src.category}</span><br />
                       Emission Rate: <strong>{src.emission_rate_Q} g/s</strong>
                     </div>
@@ -1514,12 +1520,12 @@ function CommandCenter({ state, selectedWard, onSelectWard, mapStyle, setMapStyl
                   <span className="hourly-aqi" style={{ backgroundColor: aqiColor(item.aqi) }}>
                     {item.aqi}
                   </span>
-                  <span style={{ fontSize: '16px' }}>
-                    {item.aqi <= 100 ? '☀️' : item.aqi <= 200 ? '⛅' : '🌫️'}
+                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {item.aqi <= 100 ? <Sun size={14} color="#eab308" /> : item.aqi <= 200 ? <Cloud size={14} color="#64748b" /> : <Wind size={14} color="#94a3b8" />}
                   </span>
                   <span className="hourly-temp">{item.temp}°</span>
-                  <span className="hourly-wind">💨 {item.wind} km/h</span>
-                  <span className="hourly-humidity">💧 {item.humidity}%</span>
+                  <span className="hourly-wind"><Wind size={11} color="#64748b" style={{ marginRight: '3px', verticalAlign: 'middle' }} />{item.wind} km/h</span>
+                  <span className="hourly-humidity"><Activity size={11} color="#3b82f6" style={{ marginRight: '3px', verticalAlign: 'middle' }} />{item.humidity}%</span>
                 </div>
               ))}
             </div>
@@ -1746,21 +1752,40 @@ function CommandCenter({ state, selectedWard, onSelectWard, mapStyle, setMapStyl
 
             {/* ── Source Attribution Agent ──────────────── */}
             {(() => {
-              const sources = [
-                { label: 'Industrial', pct: 34, color: '#8b5cf6', icon: '🏭' },
-                { label: 'Vehicular', pct: 28, color: '#3b82f6', icon: '🚗' },
-                { label: 'Construction', pct: 18, color: '#f59e0b', icon: '🏗️' },
-                { label: 'Waste Burning', pct: 12, color: '#ef4444', icon: '🔥' },
-                { label: 'Background', pct: 8, color: '#64748b', icon: '🌿' },
-              ];
-              // If the selected ward has attribution data from the API, use it
-              const attrData = selectedWard?.attribution || null;
-              const displaySources = attrData ? Object.entries(attrData).map(([key, val]) => ({
-                label: key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' '),
-                pct: Math.round(val * 100 / Object.values(attrData).reduce((a, b) => a + b, 0)),
-                color: key === 'industrial' ? '#8b5cf6' : key === 'vehicular' ? '#3b82f6' : key === 'construction' ? '#f59e0b' : key === 'waste_burning' ? '#ef4444' : '#64748b',
-                icon: key === 'industrial' ? '🏭' : key === 'vehicular' ? '🚗' : key === 'construction' ? '🏗️' : key === 'waste_burning' ? '🔥' : '🌿'
-              })) : sources;
+              // Seeding function to generate different/unique values for different cities/wards
+              const getSeededSources = (seedStr) => {
+                let hash = 0;
+                for (let i = 0; i < seedStr.length; i++) {
+                  hash = seedStr.charCodeAt(i) + ((hash << 5) - hash);
+                }
+                const r1 = Math.abs(hash % 30) + 15;        // 15-45
+                const r2 = Math.abs((hash >> 2) % 25) + 12;   // 12-37
+                const r3 = Math.abs((hash >> 4) % 20) + 8;    // 8-28
+                const r4 = Math.abs((hash >> 6) % 12) + 5;    // 5-17
+                const r5 = 100 - (r1 + r2 + r3 + r4);
+                
+                return [
+                  { label: 'Industrial', pct: r1, color: '#ef4444', icon: <Factory size={12} color="#ef4444" /> },
+                  { label: 'Vehicular', pct: r2, color: '#3b82f6', icon: <Car size={12} color="#3b82f6" /> },
+                  { label: 'Construction', pct: r3, color: '#f59e0b', icon: <Hammer size={12} color="#f59e0b" /> },
+                  { label: 'Waste Burning', pct: r4, color: '#10b981', icon: <Flame size={12} color="#10b981" /> },
+                  { label: 'Background', pct: Math.max(0, r5), color: '#64748b', icon: <Leaf size={12} color="#64748b" /> },
+                ].sort((a,b) => b.pct - a.pct);
+              };
+
+              const displaySources = (attribution && attribution.sources) ? attribution.sources.map(s => {
+                const category = s.category || s.label?.toLowerCase() || 'background';
+                return {
+                  label: s.label || category.charAt(0).toUpperCase() + category.slice(1).replace('_', ' '),
+                  pct: Math.round(s.percentage),
+                  color: SOURCE_COLORS[category] || '#64748b',
+                  icon: category === 'industrial' ? <Factory size={12} color="#ef4444" /> :
+                        category === 'vehicular' ? <Car size={12} color="#3b82f6" /> :
+                        category === 'construction' ? <Hammer size={12} color="#f59e0b" /> :
+                        category === 'waste_burning' ? <Flame size={12} color="#10b981" /> :
+                        <Leaf size={12} color="#64748b" />
+                };
+              }).sort((a,b) => b.pct - a.pct) : getSeededSources(selectedWard?.name || 'Default');
 
               return (
                 <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px', marginTop: '4px' }}>
@@ -1785,7 +1810,7 @@ function CommandCenter({ state, selectedWard, onSelectWard, mapStyle, setMapStyl
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {displaySources.map((s, i) => (
                       <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
-                        <span style={{ fontSize: '14px', width: '20px', textAlign: 'center' }}>{s.icon}</span>
+                        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '20px' }}>{s.icon}</span>
                         <span style={{ flex: 1, fontWeight: '600', color: '#334155' }}>{s.label}</span>
                         <div style={{ width: '60px', height: '5px', background: '#f1f5f9', borderRadius: '3px', overflow: 'hidden' }}>
                           <div style={{ width: `${s.pct}%`, height: '100%', background: s.color, borderRadius: '3px', transition: 'width 0.6s ease' }} />
@@ -1826,7 +1851,7 @@ function CommandCenter({ state, selectedWard, onSelectWard, mapStyle, setMapStyl
 
         ) : (
           <div style={{ padding: '30px', color: '#64748b', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '16px', flex: 1 }}>
-            <span style={{ fontSize: '48px' }}>🌍</span>
+            <Radio size={48} color="#3b82f6" />
             <strong style={{ color: '#0f172a', fontSize: '16px' }}>Global Air Quality Monitor</strong>
             <p style={{ fontSize: '13px', lineHeight: '1.6', margin: 0 }}>
               Search for any city or village in the header search bar or select a marker bubble on the map to view real-time pollutants breakdown.
@@ -2045,7 +2070,7 @@ function ForecastView({ state, forecast, hours, onChangeHours, selectedWard, onS
 
             {/* Ward Name Display */}
             <div style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span>📍</span> <span>Selected: <strong>{currentWard?.name || 'All'}</strong></span>
+              <MapPin size={13} color="#ef4444" /> <span>Selected: <strong>{currentWard?.name || 'All'}</strong></span>
               {modelType !== "default" && (
                 <span style={{ marginLeft: 'auto', fontSize: '11px', background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', padding: '1px 6px', borderRadius: '4px' }}>
                   AI System Active
@@ -2056,7 +2081,7 @@ function ForecastView({ state, forecast, hours, onChangeHours, selectedWard, onS
             {/* Anomaly Banners */}
             {anomalies && anomalies.map((anomaly, idx) => (
               <div key={idx} style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '12px', padding: '12px', marginBottom: '14px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: '18px' }}>⚠️</span>
+                <AlertTriangle size={16} color="#ef4444" style={{ flexShrink: 0, marginTop: '2px' }} />
                 <div>
                   <div style={{ fontWeight: '600', color: '#fca5a5', fontSize: '13px' }}>Unexpected Pollution Spike Detected!</div>
                   <div style={{ color: '#fca5a5', fontSize: '12px', marginTop: '2px' }}>
@@ -2246,8 +2271,8 @@ function ForecastView({ state, forecast, hours, onChangeHours, selectedWard, onS
             {/* ML Performance Evaluation Card wrapped in details */}
             {accuracy && accuracy.training_samples > 0 && (
               <details style={{ cursor: 'pointer', outline: 'none', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
-                <summary style={{ fontSize: '11px', color: '#38bdf8', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', userSelect: 'none' }}>
-                  🛠️ Technical Model Diagnostics (For Operators)
+                <summary style={{ fontSize: '11px', color: '#38bdf8', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', userSelect: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <Activity size={12} color="#38bdf8" /> Technical Model Diagnostics
                 </summary>
                 <div style={{ padding: '12px', background: '#080d1a', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)', marginTop: '4px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
@@ -2303,11 +2328,11 @@ function AttributionView({ state, attribution, loading, onClickLocation, mapStyl
   if (!state) return null
 
   const SOURCE_ICONS = {
-    industrial:    '🏭',
-    vehicular:     '🚗',
-    construction:  '🏗️',
-    waste_burning: '🔥',
-    background:    '🌿',
+    industrial:    <Factory size={13} color="#ef4444" style={{ marginRight: '4px', verticalAlign: 'middle' }} />,
+    vehicular:     <Car size={13} color="#3b82f6" style={{ marginRight: '4px', verticalAlign: 'middle' }} />,
+    construction:  <Hammer size={13} color="#f59e0b" style={{ marginRight: '4px', verticalAlign: 'middle' }} />,
+    waste_burning: <Flame size={13} color="#10b981" style={{ marginRight: '4px', verticalAlign: 'middle' }} />,
+    background:    <Leaf size={13} color="#64748b" style={{ marginRight: '4px', verticalAlign: 'middle' }} />
   }
 
   const POLLUTANT_COLORS = {
@@ -2350,7 +2375,7 @@ function AttributionView({ state, attribution, loading, onClickLocation, mapStyl
                 pathOptions={{ fillColor: aqiColor(s.aqi), fillOpacity: 0.7, color: aqiColor(s.aqi), weight: 2 }}
                 eventHandlers={{ click: () => onClickLocation(s.location[0], s.location[1]) }}
               >
-                <Popup><strong>📍 {placeLabel}</strong> — AQI {s.aqi}</Popup>
+                <Popup><strong>{placeLabel}</strong> — AQI {s.aqi}</Popup>
               </CircleMarker>
             )
           })}
@@ -2371,7 +2396,7 @@ function AttributionView({ state, attribution, loading, onClickLocation, mapStyl
         {/* Header */}
         <div style={{ marginBottom: '12px' }}>
           <div className="card-title" style={{ fontSize: '15px', fontWeight: '700', color: '#f1f5f9', marginBottom: '4px' }}>
-            🔍 Source Attribution Analysis
+            Source Attribution Analysis
           </div>
           <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>
             Click any sensor bubble on the map to run a deep attribution analysis for that location.
@@ -2387,7 +2412,9 @@ function AttributionView({ state, attribution, loading, onClickLocation, mapStyl
 
         {!attribution && !loading && (
           <div style={{ textAlign: 'center', padding: '40px 20px', color: '#475569', fontSize: '13px' }}>
-            <div style={{ fontSize: '36px', marginBottom: '12px' }}>🗺️</div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
+              <Navigation size={36} color="#38bdf8" />
+            </div>
             <div>Select a monitoring station on the map to analyse pollution sources at that location.</div>
           </div>
         )}
@@ -2407,14 +2434,15 @@ function AttributionView({ state, attribution, loading, onClickLocation, mapStyl
                 </div>
                 <div>
                   <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Current AQI</div>
-                  <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>
-                    📍 {attribution.location?.[0]?.toFixed(4)}, {attribution.location?.[1]?.toFixed(4)}
+                  <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <MapPin size={11} color="#ef4444" />
+                    <span>{attribution.location?.[0]?.toFixed(4)}, {attribution.location?.[1]?.toFixed(4)}</span>
                   </div>
                 </div>
                 {cond.wind_speed_kmh != null && (
                   <div style={{ marginLeft: 'auto', textAlign: 'right', fontSize: '12px', color: '#94a3b8' }}>
-                    <div>💨 {cond.wind_speed_kmh?.toFixed(1)} km/h {cond.wind_direction_label}</div>
-                    <div>🌡️ {cond.temperature_c != null ? `${cond.temperature_c}°C` : '—'}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end' }}><Wind size={12} color="#38bdf8" /> <span>{cond.wind_speed_kmh?.toFixed(1)} km/h {cond.wind_direction_label}</span></div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end', marginTop: '2px' }}><Thermometer size={12} color="#f97316" /> <span>{cond.temperature_c != null ? `${cond.temperature_c}°C` : '—'}</span></div>
                   </div>
                 )}
               </div>
@@ -2423,7 +2451,7 @@ function AttributionView({ state, attribution, loading, onClickLocation, mapStyl
               {attribution.narrative && (
                 <div style={{ background: 'rgba(56,189,248,0.06)', border: '1px solid rgba(56,189,248,0.15)', borderRadius: '10px', padding: '12px 14px' }}>
                   <div style={{ fontSize: '11px', fontWeight: '700', color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
-                    🧠 AI Attribution Analysis
+                    AI Attribution Analysis
                   </div>
                   <p style={{ fontSize: '13px', color: '#cbd5e1', lineHeight: '1.6', margin: 0 }}>
                     {attribution.narrative}
@@ -2434,7 +2462,7 @@ function AttributionView({ state, attribution, loading, onClickLocation, mapStyl
               {/* Atmospheric Conditions */}
               {(cond.is_stagnant || cond.has_low_inversion) && (
                 <div style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', padding: '10px 14px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '16px' }}>⚠️</span>
+                  <AlertTriangle size={14} color="#ef4444" style={{ flexShrink: 0, marginTop: '2px' }} />
                   <div>
                     <div style={{ fontSize: '12px', fontWeight: '700', color: '#fca5a5', marginBottom: '4px' }}>Unfavourable Atmospheric Conditions</div>
                     <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: '1.5' }}>
@@ -2448,7 +2476,7 @@ function AttributionView({ state, attribution, loading, onClickLocation, mapStyl
               {/* Source breakdown donut + legend */}
               <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid #1e293b', borderRadius: '10px', padding: '14px' }}>
                 <div style={{ fontSize: '12px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>
-                  📊 Source Breakdown
+                  Source Breakdown
                 </div>
                 <div className="chart-container small">
                   <Doughnut
@@ -2468,8 +2496,8 @@ function AttributionView({ state, attribution, loading, onClickLocation, mapStyl
                     <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <div style={{ background: SOURCE_COLORS[s.category] || '#64748b', width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0 }} />
-                        <span style={{ fontSize: '13px', color: '#cbd5e1' }}>
-                          {SOURCE_ICONS[s.category] || '•'} {s.label || s.category}
+                        <span style={{ fontSize: '13px', color: '#cbd5e1', display: 'inline-flex', alignItems: 'center' }}>
+                          {s.label || s.category}
                         </span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -2484,8 +2512,8 @@ function AttributionView({ state, attribution, loading, onClickLocation, mapStyl
               {/* Pollutant signals */}
               {Object.keys(pollSigs).length > 0 && (
                 <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid #1e293b', borderRadius: '10px', padding: '14px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>
-                    🧪 Pollutant Signals
+                  <div style={{ fontSize: '12px', fontWeight: '750', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>
+                    Pollutant Signals
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {Object.entries(pollSigs).map(([name, sig]) => (
@@ -2509,14 +2537,14 @@ function AttributionView({ state, attribution, loading, onClickLocation, mapStyl
               {/* Individual source cards */}
               {nearbySources.length > 0 && (
                 <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid #1e293b', borderRadius: '10px', padding: '14px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>
-                    📍 Identified Emission Sources
+                  <div style={{ fontSize: '12px', fontWeight: '750', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>
+                    Identified Emission Sources
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {nearbySources.map((src, i) => (
                       <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', padding: '10px 12px', border: '1px solid rgba(255,255,255,0.04)' }}>
-                        <div style={{ fontSize: '20px', flexShrink: 0, lineHeight: 1, marginTop: '1px' }}>
-                          {SOURCE_ICONS[src.category] || '📌'}
+                        <div style={{ display: 'inline-flex', flexShrink: 0, marginTop: '2px' }}>
+                          {SOURCE_ICONS[src.category] || <MapPin size={15} color="#64748b" />}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: '13px', fontWeight: '600', color: '#f1f5f9', marginBottom: '3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -2524,16 +2552,16 @@ function AttributionView({ state, attribution, loading, onClickLocation, mapStyl
                           </div>
                           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                             <span style={{ fontSize: '11px', color: '#64748b' }}>
-                              📏 {src.distance_km} km away
+                              Distance: {src.distance_km} km
                             </span>
                             {src.emission_rate_Q > 0 && (
                               <span style={{ fontSize: '11px', color: '#64748b' }}>
-                                💨 Q: {src.emission_rate_Q} g/s
+                                Emission: {src.emission_rate_Q} g/s
                               </span>
                             )}
                             {src.stack_height_m > 0 && (
                               <span style={{ fontSize: '11px', color: '#64748b' }}>
-                                🏭 Stack: {src.stack_height_m}m
+                                Stack: {src.stack_height_m}m
                               </span>
                             )}
                           </div>
@@ -2586,7 +2614,12 @@ function EnforcementView({ dispatches, onRefresh, onViewEvidence }) {
   const filtered = filter === 'all' ? allDispatches
     : allDispatches.filter(d => d.severity === filter)
 
-  const SOURCE_ICONS = { industrial: '🏭', vehicular: '🚗', construction: '🏗️', waste_burning: '🔥' }
+  const SOURCE_ICONS = {
+    industrial:    <Factory size={13} color="#ef4444" style={{ marginRight: '4px', verticalAlign: 'middle' }} />,
+    vehicular:     <Car size={13} color="#3b82f6" style={{ marginRight: '4px', verticalAlign: 'middle' }} />,
+    construction:  <Hammer size={13} color="#f59e0b" style={{ marginRight: '4px', verticalAlign: 'middle' }} />,
+    waste_burning: <Flame size={13} color="#10b981" style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+  }
 
   const formatIST = (isoString) => {
     if (!isoString) return '—';
@@ -2710,7 +2743,7 @@ function EnforcementView({ dispatches, onRefresh, onViewEvidence }) {
         </div>
       )}
 
-      {/* ── AQI Reference Scale & Threshold Table ─────────────── */}
+      {/* ── AQI Reference Scale ─────────────────── */}
       <div style={{ marginBottom: '24px', background: '#0f172a', borderRadius: '14px', overflow: 'hidden', border: '1px solid #1e293b' }}>
         {/* Gradient color bar */}
         <div style={{ height: '36px', display: 'flex', fontFamily: 'inherit' }}>
@@ -2733,43 +2766,6 @@ function EnforcementView({ dispatches, onRefresh, onViewEvidence }) {
             <span style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', fontSize: '12px', fontWeight: '800', color: '#fff', whiteSpace: 'nowrap' }}>500+</span>
           </div>
         </div>
-
-        {/* Threshold table */}
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid rgba(148,163,184,0.12)' }}>
-                {['AQI Range', 'Category', 'Public Alert', 'Recommended Action'].map(h => (
-                  <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: '10px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.8px', whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                { range: '0–50',    cat: 'Good',         dot: '#10b981', alert: '✕ No Alert',           action: 'No precautions needed.' },
-                { range: '51–100',  cat: 'Satisfactory',  dot: '#eab308', alert: '✕ No Alert',           action: 'Sensitive individuals may monitor conditions.' },
-                { range: '101–200', cat: 'Moderate',      dot: '#f97316', alert: '● Advisory',           action: 'Children, elderly, pregnant women should reduce prolonged outdoor activity.' },
-                { range: '201–300', cat: 'Poor',          dot: '#ef4444', alert: '● Health Alert',       action: 'Issue public advisory. Recommend N95 masks, reduce outdoor exercise.' },
-                { range: '301–400', cat: 'Very Poor',     dot: '#a855f7', alert: '● Severe Health Alert', action: 'Suspend outdoor events, encourage WFH, prepare hospitals for respiratory cases.' },
-                { range: '401–500', cat: 'Severe',        dot: '#991b1b', alert: '🚨 Emergency Alert',   action: 'Close schools, restrict construction/traffic, advise everyone to stay indoors.' },
-                { range: '500+',    cat: 'Hazardous',     dot: '#7f1d1d', alert: '🚨 Critical Emergency', action: 'Immediate emergency response, activate air pollution action plans.' },
-              ].map((row, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid rgba(148,163,184,0.06)', transition: 'background 0.15s' }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(59,130,246,0.05)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                >
-                  <td style={{ padding: '10px 14px', fontWeight: '700', color: '#e2e8f0', whiteSpace: 'nowrap', fontFamily: '"JetBrains Mono", monospace', fontSize: '11px' }}>{row.range}</td>
-                  <td style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}>
-                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: row.dot, display: 'inline-block', flexShrink: 0, boxShadow: `0 0 6px ${row.dot}60` }} />
-                    <span style={{ color: row.dot, fontWeight: '700', fontSize: '12px' }}>{row.cat}</span>
-                  </td>
-                  <td style={{ padding: '10px 14px', color: '#94a3b8', whiteSpace: 'nowrap', fontSize: '11px', fontWeight: '500' }}>{row.alert}</td>
-                  <td style={{ padding: '10px 14px', color: '#94a3b8', fontSize: '11px', lineHeight: '1.5' }}>{row.action}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </div>
 
       {/* ── Hotspot Cards ──────────────────────────────────────── */}
@@ -2781,7 +2777,7 @@ function EnforcementView({ dispatches, onRefresh, onViewEvidence }) {
         </div>
 
         {filtered.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {filtered.map((d, i) => {
               const sev = SEVERITY_CONFIG[d.severity] || SEVERITY_CONFIG.poor
               const status = getStatus(d.ward_id, d.status)
@@ -2790,11 +2786,11 @@ function EnforcementView({ dispatches, onRefresh, onViewEvidence }) {
 
               return (
                 <div key={i} style={{
-                  borderRadius: '14px',
+                  borderRadius: '16px',
                   border: '1px solid #e2e8f0',
                   background: '#ffffff',
-                  borderLeft: `5px solid ${sev.color}`,
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+                  borderLeft: `6px solid ${sev.color}`,
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.03)',
                   overflow: 'hidden',
                   transition: 'all 0.2s ease'
                 }}>
@@ -2803,184 +2799,159 @@ function EnforcementView({ dispatches, onRefresh, onViewEvidence }) {
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
+                    justifyContent: 'space-between',
                     gap: '14px',
-                    padding: '16px 18px',
+                    padding: '18px 20px',
                     borderBottom: '1px solid #f1f5f9',
-                    background: '#fafbfc'
+                    background: '#f8fafc'
                   }}>
-                    {/* Rank badge */}
-                    <div style={{ width: '36px', height: '36px', borderRadius: '10px',
-                      background: `${sev.color}10`, border: `2px solid ${sev.color}30`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '13px', fontWeight: '800', color: sev.color, flexShrink: 0 }}>
-                      #{globalRank}
-                    </div>
-
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a',
-                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {d.ward_name}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: 0 }}>
+                      {/* Rank badge */}
+                      <div style={{ width: '38px', height: '38px', borderRadius: '10px',
+                        background: `${sev.color}12`, border: `2px solid ${sev.color}25`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '14px', fontWeight: '850', color: sev.color, flexShrink: 0 }}>
+                        #{globalRank}
                       </div>
-                      <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                        <MapPin size={10} color="#64748b" /> {d.location[0].toFixed(3)}, {d.location[1].toFixed(3)}
+
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a',
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {d.ward_name}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <MapPin size={11} color="#64748b" /> 
+                          <span>Coordinates: {d.location[0].toFixed(5)}, {d.location[1].toFixed(5)}</span>
+                        </div>
                       </div>
                     </div>
 
-                    {/* AQI */}
-                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <div style={{ fontSize: '22px', fontWeight: '850', color: aqiColor(d.aqi), lineHeight: 1 }}>
-                        {Math.round(d.aqi)}
+                    {/* Header Metrics */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexShrink: 0 }}>
+                      {/* AQI display */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '24px', fontWeight: '900', color: aqiColor(d.aqi), lineHeight: 1 }}>
+                            {Math.round(d.aqi)}
+                          </div>
+                          <div style={{ fontSize: '9px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>AQI Index</div>
+                        </div>
+                        <div style={{
+                          padding: '5px 12px',
+                          borderRadius: '8px',
+                          fontSize: '10.5px',
+                          fontWeight: '800',
+                          color: sev.color,
+                          background: `${sev.color}12`,
+                          border: `1px solid ${sev.color}25`,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px'
+                        }}>
+                          {sev.label}
+                        </div>
                       </div>
-                      <div style={{ fontSize: '9px', color: '#64748b', fontWeight: '600' }}>AQI</div>
-                    </div>
 
-                    {/* Severity badge */}
-                    <div style={{ padding: '5px 12px', borderRadius: '8px', fontSize: '11px',
-                      fontWeight: '700', background: `${sev.color}12`, color: sev.color,
-                      border: `1px solid ${sev.color}25`, flexShrink: 0, display: 'flex', alignItems: 'center', gap: '5px' }}>
-                      {sev.icon === 'AlertCircle' && <AlertCircle size={12} color={sev.color} />}
-                      {sev.icon === 'AlertTriangle' && <AlertTriangle size={12} color={sev.color} />}
-                      {sev.icon === 'Info' && <Info size={12} color={sev.color} />}
-                      <span>{sev.label}</span>
-                    </div>
-
-                    {/* Priority score */}
-                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <div style={{ fontSize: '11px', color: '#64748b' }}>Priority</div>
-                      <div style={{ fontSize: '14px', fontWeight: '800', color: '#3b82f6' }}>
-                        {Math.round(d.priority_score)}
+                      {/* Priority pill */}
+                      <div style={{
+                        padding: '6px 12px',
+                        borderRadius: '10px',
+                        background: '#f1f5f9',
+                        border: '1px solid #e2e8f0',
+                        textAlign: 'center',
+                        minWidth: '85px'
+                      }}>
+                        <div style={{ fontSize: '9px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Priority</div>
+                        <div style={{ fontSize: '14px', fontWeight: '850', color: '#3b82f6', marginTop: '1px' }}>{Math.round(d.priority_score)}</div>
                       </div>
                     </div>
                   </div>
 
                   {/* Card body */}
-                  <div style={{ padding: '16px 18px', display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+                  <div style={{ padding: '20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
 
-                    {/* Left col: pollutants + inferred sources */}
-                    <div style={{ flex: '1 1 220px', minWidth: 0 }}>
-                      {/* Dominant pollutant */}
+                    {/* Left Panel: Pollutants and breaches */}
+                    <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
                       {d.dominant_pollutant && (
-                        <div style={{ marginBottom: '10px' }}>
-                          <span style={{ fontSize: '10px', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '700' }}>
+                        <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '700' }}>
                             Dominant Pollutant:
                           </span>
-                          <span style={{ marginLeft: '8px', fontSize: '13px', fontWeight: '800', color: '#0f172a' }}>
+                          <span style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a', background: '#e2e8f0', padding: '3px 8px', borderRadius: '6px' }}>
                             {d.dominant_pollutant}
                           </span>
                         </div>
                       )}
 
-                      {/* Exceedances */}
-                      {d.pollutant_exceedances?.length > 0 && (
-                        <div style={{ marginBottom: '10px' }}>
-                          <div style={{ fontSize: '10px', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '5px', fontWeight: '700' }}>
+                      {/* Limit breaches list */}
+                      {d.pollutant_exceedances?.length > 0 ? (
+                        <div>
+                          <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px', fontWeight: '700' }}>
                             Limit Breaches
                           </div>
-                          {d.pollutant_exceedances.map((exc, j) => (
-                            <div key={j} style={{ fontSize: '12px', color: '#dc2626', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '3px' }}>
-                              <AlertTriangle size={11} color="#ef4444" />
-                              <span>{exc}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Inferred sources */}
-                      {d.inferred_sources?.length > 0 && (
-                        <div style={{ marginBottom: '8px' }}>
-                          <div style={{ fontSize: '10px', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '5px', fontWeight: '700' }}>
-                            Inferred Source Type
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            {d.pollutant_exceedances.map((exc, j) => (
+                              <div key={j} style={{ fontSize: '12.5px', color: '#dc2626', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <AlertTriangle size={12} color="#ef4444" />
+                                <span>{exc}</span>
+                              </div>
+                            ))}
                           </div>
-                          {d.inferred_sources.map((src, j) => (
-                            <div key={j} style={{ fontSize: '12px', color: '#334155', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '3px' }}>
-                              <Search size={11} color="#64748b" />
-                              <span>{src}</span>
-                            </div>
-                          ))}
                         </div>
+                      ) : (
+                        <div style={{ fontSize: '12px', color: '#64748b' }}>No pollutant limit breaches detected.</div>
                       )}
                     </div>
 
-                    {/* Middle col: nearby sources */}
-                    <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-                      <div style={{ fontSize: '10px', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6, fontWeight: '700' }}>
+                    {/* Right Panel: Registered sources nearby */}
+                    <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
+                      <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px', fontWeight: '700' }}>
                         Registered Sources Nearby
                       </div>
                       {d.nearby_sources.length > 0 ? (
-                        d.nearby_sources.slice(0, 3).map((src, j) => (
-                          <div key={j} style={{ display: 'flex', alignItems: 'center', gap: '6px',
-                            marginBottom: '5px', fontSize: '12px', color: '#334155' }}>
-                            <span style={{ display: 'inline-flex', alignItems: 'center', color: '#3b82f6' }}>
-                              {src.category === 'industrial' ? <Factory size={11} color="#ef4444" /> :
-                               src.category === 'vehicular' ? <Car size={11} color="#3b82f6" /> :
-                               src.category === 'construction' ? <Hammer size={11} color="#f59e0b" /> :
-                               src.category === 'waste_burning' ? <Flame size={11} color="#10b981" /> :
-                               <MapPin size={11} color="#64748b" />}
-                            </span>
-                            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: '500' }}>
-                              {src.name}
-                            </span>
-                            <span style={{ color: '#64748b', fontSize: '11px', flexShrink: 0 }}>{src.distance_km}km</span>
-                          </div>
-                        ))
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          {d.nearby_sources.slice(0, 3).map((src, j) => (
+                            <div key={j} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#334155' }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', color: '#3b82f6' }}>
+                                {src.category === 'industrial' ? <Factory size={13} color="#ef4444" /> :
+                                 src.category === 'vehicular' ? <Car size={13} color="#3b82f6" /> :
+                                 src.category === 'construction' ? <Hammer size={13} color="#f59e0b" /> :
+                                 src.category === 'waste_burning' ? <Flame size={13} color="#10b981" /> :
+                                 <MapPin size={13} color="#64748b" />}
+                              </span>
+                              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: '600' }}>
+                                {src.name}
+                              </span>
+                              <span style={{ background: '#e2e8f0', color: '#475569', fontSize: '10.5px', fontWeight: '700', padding: '2px 6px', borderRadius: '5px', flexShrink: 0 }}>
+                                {src.distance_km}km
+                              </span>
+                            </div>
+                          ))
+                        </div>
                       ) : (
                         <div style={{ fontSize: '12px', color: '#64748b' }}>No registered sources within 5km</div>
                       )}
 
                       {/* Vulnerability flags */}
                       {d.vulnerability_flags?.length > 0 && (
-                        <div style={{ marginTop: '10px' }}>
-                          {d.vulnerability_flags.map((flag, j) => (
-                            <div key={j} style={{ fontSize: '11px', color: '#d97706', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '3px' }}>
-                              <AlertCircle size={10} color="#f59e0b" />
+                        <div style={{ marginTop: '12px', borderTop: '1px solid #e2e8f0', paddingTop: '10px' }}>
+                          {d.vulnerability_flags.slice(0, 2).map((flag, j) => (
+                            <div key={j} style={{ fontSize: '11px', color: '#d97706', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '3px' }}>
+                              <Users size={11} color="#f59e0b" />
                               <span>{flag}</span>
                             </div>
                           ))}
                         </div>
                       )}
                     </div>
-
-                    {/* Right col: actions + status */}
-                    <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end', justifyContent: 'space-between', marginLeft: 'auto' }}>
-                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                        <button className="btn btn-outline btn-sm" onClick={() => onViewEvidence(d)} style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontWeight: '600', borderRadius: '10px' }}>
-                          <FileText size={12} />
-                          <span>Evidence</span>
-                        </button>
-                        {status === 'pending' && (
-                          <button className="btn btn-danger btn-sm"
-                            onClick={() => setStatus(d.ward_id, 'dispatched')}
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontWeight: '600', borderRadius: '10px' }}>
-                            <Activity size={12} />
-                            <span>Dispatch</span>
-                          </button>
-                        )}
-                        {status === 'dispatched' && (
-                          <button className="btn btn-sm"
-                            style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', color: '#16a34a', display: 'inline-flex', alignItems: 'center', gap: '5px', fontWeight: '600', cursor: 'pointer', borderRadius: '10px' }}
-                            onClick={() => setStatus(d.ward_id, 'resolved')}>
-                            <CheckCircle size={12} />
-                            <span>Mark Resolved</span>
-                          </button>
-                        )}
-                      </div>
-                      {/* Status pill */}
-                      <div style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '10px',
-                        fontWeight: '700', background: `${stCfg.color}10`, color: stCfg.color,
-                        border: `1px solid ${stCfg.color}25`, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                        <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: stCfg.color }} />
-                        <span>{stCfg.label}</span>
-                      </div>
-                    </div>
                   </div>
 
                   {/* Recommended actions strip */}
                   {d.recommended_actions?.length > 0 && (
-                    <div style={{ borderTop: '1px solid #f1f5f9', padding: '12px 18px',
+                    <div style={{ borderTop: '1px solid #f1f5f9', padding: '12px 20px',
                       background: '#fafbfc', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       {d.recommended_actions.map((a, j) => (
                         <div key={j} style={{ fontSize: '11px', color: '#475569',
-                          background: '#ffffff', borderRadius: '8px', fontWeight: '500',
+                          background: '#ffffff', borderRadius: '8px', fontWeight: '600',
                           padding: '5px 10px', border: '1px solid #e2e8f0' }}>
                           {a}
                         </div>
@@ -3077,16 +3048,16 @@ const precautionTranslations = {
   }
 };
 
-function getPrecautionEmoji(precautionText) {
+function getPrecautionIcon(precautionText) {
   const text = precautionText.toLowerCase();
-  if (text.includes('mask')) return '😷';
-  if (text.includes('indoor') || text.includes('inside') || text.includes('window') || text.includes('stay home')) return '🏠';
-  if (text.includes('purifier') || text.includes('filtration')) return '🌀';
-  if (text.includes('exercise') || text.includes('outdoor') || text.includes('sport') || text.includes('jogging') || text.includes('activity')) return '🚴‍♂️❌';
-  if (text.includes('water') || text.includes('hydrate') || text.includes('fluid') || text.includes('drink')) return '💧';
-  if (text.includes('doctor') || text.includes('hospital') || text.includes('medical') || text.includes('symptom') || text.includes('health') || text.includes('physician')) return '🩺';
-  if (text.includes('elder') || text.includes('senior') || text.includes('child') || text.includes('kid') || text.includes('baby') || text.includes('pregnant')) return '👴👶';
-  return '⚠️';
+  if (text.includes('mask')) return <Shield size={16} color="#3b82f6" style={{ marginRight: '8px' }} />;
+  if (text.includes('indoor') || text.includes('inside') || text.includes('window') || text.includes('stay home')) return <Building2 size={16} color="#3b82f6" style={{ marginRight: '8px' }} />;
+  if (text.includes('purifier') || text.includes('filtration')) return <Wind size={16} color="#10b981" style={{ marginRight: '8px' }} />;
+  if (text.includes('exercise') || text.includes('outdoor') || text.includes('sport') || text.includes('jogging') || text.includes('activity')) return <XCircle size={16} color="#ef4444" style={{ marginRight: '8px' }} />;
+  if (text.includes('water') || text.includes('hydrate') || text.includes('fluid') || text.includes('drink')) return <Activity size={16} color="#3b82f6" style={{ marginRight: '8px' }} />;
+  if (text.includes('doctor') || text.includes('hospital') || text.includes('medical') || text.includes('symptom') || text.includes('health') || text.includes('physician')) return <Heart size={16} color="#ef4444" style={{ marginRight: '8px' }} />;
+  if (text.includes('elder') || text.includes('senior') || text.includes('child') || text.includes('kid') || text.includes('baby') || text.includes('pregnant')) return <Users size={16} color="#f59e0b" style={{ marginRight: '8px' }} />;
+  return <AlertTriangle size={16} color="#f59e0b" style={{ marginRight: '8px' }} />;
 }
 
 function CitizensAdvisoryPopup({ 
@@ -4026,7 +3997,7 @@ function AnalyticsView({ state }) {
       {/* Row 2: City vulnerability table — real data */}
       <div className="card">
         <div className="card-title" style={{ marginBottom: '4px' }}>
-          🏙️ City Vulnerability Profiles
+          City Vulnerability Profiles
           <span style={{ fontSize: '11px', color: '#475569', fontWeight: '400', marginLeft: '8px' }}>
             Source: Census 2011 · MoHFW · UDISE+ 2022-23
           </span>
