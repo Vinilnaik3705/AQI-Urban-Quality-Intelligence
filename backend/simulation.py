@@ -853,7 +853,7 @@ class SimulationEngine:
                 params = {
                     "latitude": ",".join(batch_lats),
                     "longitude": ",".join(batch_lngs),
-                    "current": "pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone",
+                    "current": "us_aqi,us_aqi_pm2_5,us_aqi_pm10,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone",
                 }
                 async with httpx.AsyncClient(timeout=25.0) as client:
                     resp = await client.get(url, params=params)
@@ -880,8 +880,8 @@ class SimulationEngine:
                                 aqi_in = aq_data["aqi"]
                                 source = aq_data["source"]
                             else:
-                                pollutants = {"pm25": 30.0, "pm10": 60.0, "no2": 25.0, "so2": 8.0, "co": 0.6, "o3": 45.0}
-                                aqi_in = 80.0
+                                pollutants = {"pm25": 15.0, "pm10": 30.0, "no2": 10.0, "so2": 5.0, "co": 0.3, "o3": 20.0}
+                                aqi_in = 40.0
                                 source = "estimation (fallback)"
                             r_entry = {
                                 "sensor_id": f"SENSOR_{k}",
@@ -907,25 +907,31 @@ class SimulationEngine:
                         self._cache[f"wind_{k}"] = (ws, wd)
  
                         curr = item.get("current", {})
-                        pm25 = curr.get("pm2_5", 25.0)
-                        pm10 = curr.get("pm10", 50.0)
-                        lat_k, lng_k = CITIES[k]["center"]
-                        factor = get_indian_seasonal_calibration(lat_k, lng_k)
-                        gas_factor = max(0.5, factor) if factor < 1.0 else factor
- 
+                        us_aqi = curr.get("us_aqi", None)
+                        us_pm25_aqi = curr.get("us_aqi_pm2_5", 0)
+                        us_pm10_aqi = curr.get("us_aqi_pm10", 0)
+                        no2_raw = curr.get("nitrogen_dioxide", 0) or 0
+                        so2_raw = curr.get("sulphur_dioxide", 0) or 0
+                        co_raw = (curr.get("carbon_monoxide", 0) or 0) / 1000.0
+                        o3_raw = curr.get("ozone", 0) or 0
+
+                        if us_aqi is not None:
+                            aqi_in = float(us_aqi)
+                            pm25_display = _us_aqi_to_pm25(us_pm25_aqi)
+                            pm10_display = _us_aqi_to_pm10(us_pm10_aqi)
+                        else:
+                            pm25_display = curr.get("pm2_5", 15.0) or 15.0
+                            pm10_display = curr.get("pm10", 30.0) or 30.0
+                            aqi_in = calculate_indian_aqi(pm25_display, pm10_display, no2_raw, so2_raw, co_raw, o3_raw)
+
                         pollutants = {
-                            "pm25": round(pm25 * factor, 1),
-                            "pm10": round(pm10 * factor, 1),
-                            "no2": max(0.0, round(curr.get("nitrogen_dioxide", 20.0) * gas_factor, 1)),
-                            "so2": max(0.0, round(curr.get("sulphur_dioxide", 5.0) * gas_factor, 1)),
-                            "co": max(0.0, round(((curr.get("carbon_monoxide", 300.0) * gas_factor) / 1000.0), 2)),
-                            "o3": max(0.0, round(curr.get("ozone", 30.0) * gas_factor, 1)),
+                            "pm25": round(pm25_display, 1),
+                            "pm10": round(pm10_display, 1),
+                            "no2": round(no2_raw, 1),
+                            "so2": round(so2_raw, 1),
+                            "co": round(co_raw, 2),
+                            "o3": round(o3_raw, 1),
                         }
- 
-                        aqi_in = calculate_indian_aqi(
-                            pollutants["pm25"], pollutants["pm10"], pollutants["no2"],
-                            pollutants["so2"], pollutants["co"], pollutants["o3"]
-                        )
                         source = "open-meteo (live)"
 
                         r_entry = {
