@@ -137,48 +137,46 @@ def _calculate_sub_index(val: float, breakpoints: List[tuple]) -> float:
     return 0.0
 
 def calculate_indian_aqi(pm25: float, pm10: float, no2: float, so2: float, co: float, o3: float) -> float:
-    """Calculate the official Indian AQI (IND-AQI) using CPCB breakpoints.
+    """Calculate the US EPA AQI (0-500 scale) to align with popular global weather and AQI websites.
 
-    Notes on units expected (matching CPCB standard):
-      pm25, pm10, no2, so2, o3 → µg/m³  (24-hr avg for PM, 1-hr for gases)
-      co → mg/m³ (8-hr avg)
-
-    Open-Meteo CAMS model tends to significantly overestimate surface-level
-    NO2, SO2, and O3 for Indian cities compared to CPCB ground station readings
-    because CAMS uses a coarse global grid and lacks hyper-local sink effects.
-    PM2.5 and PM10 are the primary and most reliable pollutants from CAMS for India.
-
-    To avoid CAMS model gas artefacts inflating the AQI unrealistically:
-      - O3: cap at 100 µg/m³ (above 100 would only occur in severe smog events
-        that would also show elevated PM — rare for CAMS surface output in India)
-      - NO2: only include if > 10 µg/m³ (below that CAMS values are noise)
-      - SO2: only include if > 5 µg/m³
-      - CO: only include if > 0.3 mg/m³ (very low threshold since CAMS CO is
-        already conservative after unit conversion)
+    Notes on units expected:
+      pm25, pm10 → µg/m³
+      no2, so2, o3 → µg/m³ (converted to ppb internally)
+      co → mg/m³ (converted to ppm internally)
     """
-    pm25_bp = [(0, 30, 0, 50), (30, 60, 50, 100), (60, 90, 100, 200), (90, 120, 200, 300), (120, 250, 300, 400), (250, 500, 400, 500)]
-    pm10_bp = [(0, 50, 0, 50), (50, 100, 50, 100), (100, 250, 100, 200), (250, 350, 200, 300), (350, 430, 300, 400), (430, 1000, 400, 500)]
-    no2_bp  = [(0, 40, 0, 50), (40, 80, 50, 100), (80, 180, 100, 200), (180, 280, 200, 300), (280, 400, 300, 400), (400, 1000, 400, 500)]
-    so2_bp  = [(0, 40, 0, 50), (40, 80, 50, 100), (80, 380, 100, 200), (380, 800, 200, 300), (800, 1600, 300, 400), (1600, 5000, 400, 500)]
-    co_bp   = [(0, 1.0, 0, 50), (1.0, 2.0, 50, 100), (2.0, 10.0, 100, 200), (10.0, 17.0, 200, 300), (17.0, 34.0, 300, 400), (34.0, 100.0, 400, 500)]
-    o3_bp   = [(0, 50, 0, 50), (50, 100, 50, 100), (100, 168, 100, 200), (168, 208, 200, 300), (208, 748, 300, 400), (748, 2000, 400, 500)]
-
-    # Cap O3 to realistic CAMS surface range for India (model overestimates >100)
-    o3_capped = min(o3, 100.0)
+    # US EPA PM2.5 and PM10 breakpoints
+    pm25_bp = [(0.0, 12.0, 0, 50), (12.1, 35.4, 51, 100), (35.5, 55.4, 101, 150), (55.5, 150.4, 151, 200), (150.5, 250.4, 201, 300), (250.5, 350.4, 301, 400), (350.5, 500.4, 401, 500)]
+    pm10_bp = [(0, 54, 0, 50), (55, 154, 51, 100), (155, 254, 101, 150), (255, 354, 151, 200), (355, 424, 201, 300), (425, 504, 301, 400), (505, 604, 401, 500)]
+    
+    # NO2 conversion: 1 ppb = 1.88 µg/m³
+    no2_ppb = no2 / 1.88
+    no2_bp = [(0, 53, 0, 50), (54, 100, 51, 100), (101, 360, 101, 150), (361, 649, 151, 200), (650, 1249, 201, 300), (1250, 1649, 301, 400), (1650, 2049, 401, 500)]
+    
+    # SO2 conversion: 1 ppb = 2.62 µg/m³
+    so2_ppb = so2 / 2.62
+    so2_bp = [(0, 35, 0, 50), (36, 75, 51, 100), (76, 185, 101, 150), (186, 304, 151, 200), (305, 604, 201, 300), (605, 804, 301, 400), (805, 1004, 401, 500)]
+    
+    # CO conversion: 1 ppm = 1.15 mg/m³
+    co_ppm = co / 1.15
+    co_bp = [(0.0, 4.4, 0, 50), (4.5, 9.4, 51, 100), (9.5, 12.4, 101, 150), (12.5, 15.4, 151, 200), (15.5, 30.4, 201, 300), (30.5, 40.4, 301, 400), (40.5, 50.4, 401, 500)]
+    
+    # O3 conversion: 1 ppb = 1.96 µg/m³
+    o3_ppb = o3 / 1.96
+    o3_bp = [(0, 54, 0, 50), (55, 70, 51, 100), (71, 85, 101, 150), (86, 105, 151, 200), (106, 200, 201, 300), (201, 400, 301, 400), (401, 500, 401, 500)]
 
     indices = []
     if pm25 > 0:
         indices.append(_calculate_sub_index(pm25, pm25_bp))
     if pm10 > 0:
         indices.append(_calculate_sub_index(pm10, pm10_bp))
-    if no2 > 10.0:   # ignore CAMS noise below meaningful detection level
-        indices.append(_calculate_sub_index(no2, no2_bp))
-    if so2 > 5.0:
-        indices.append(_calculate_sub_index(so2, so2_bp))
-    if co > 0.3:
-        indices.append(_calculate_sub_index(co, co_bp))
-    if o3_capped > 10.0:
-        indices.append(_calculate_sub_index(o3_capped, o3_bp))
+    if no2_ppb > 0:
+        indices.append(_calculate_sub_index(no2_ppb, no2_bp))
+    if so2_ppb > 0:
+        indices.append(_calculate_sub_index(so2_ppb, so2_bp))
+    if co_ppm > 0:
+        indices.append(_calculate_sub_index(co_ppm, co_bp))
+    if o3_ppb > 0:
+        indices.append(_calculate_sub_index(o3_ppb, o3_bp))
 
     return max(indices) if indices else 0.0
 
