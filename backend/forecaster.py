@@ -43,10 +43,10 @@ class AQIForecaster:
             "end_date": end_str
         }
 
-        max_retries = 3
+        max_retries = 4
 
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with httpx.AsyncClient(timeout=20.0) as client:
                 # Fetch AQ data first
                 aq_resp = await client.get(aq_url, params=aq_params)
                 if aq_resp.status_code != 200:
@@ -60,7 +60,7 @@ class AQIForecaster:
                     if weather_resp.status_code == 200:
                         break
                     elif weather_resp.status_code == 429:
-                        wait_time = (2 ** attempt) + 1  # 1s, 3s, 5s
+                        wait_time = 5 * (2 ** attempt)  # 5s, 10s, 20s, 40s
                         logger.warning(f"Weather API rate-limited (429). Retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})")
                         await asyncio.sleep(wait_time)
                     else:
