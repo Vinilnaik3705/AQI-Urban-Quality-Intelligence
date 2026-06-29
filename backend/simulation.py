@@ -239,6 +239,69 @@ def get_nearest_live_city(lat: float, lng: float) -> str:
 
 
 
+
+# ── OpenWeatherMap Air Pollution API ─────────────────────────────────────────
+
+def _get_openweather_key() -> Optional[str]:
+    """Retrieve the OpenWeatherMap API key from the environment variables or the local .env file."""
+    key = os.environ.get("OPENWEATHER_API_KEY")
+    if key:
+        return key
+    try:
+        env_path = os.path.join(os.path.dirname(__file__), ".env")
+        if not os.path.exists(env_path):
+            env_path = os.path.join(os.path.dirname(__file__), "../.env")
+        if os.path.exists(env_path):
+            with open(env_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    if line.strip().startswith("OPENWEATHER_API_KEY="):
+                        return line.strip().split("=", 1)[1].strip()
+    except Exception:
+        pass
+    return None
+
+
+async def _fetch_real_aqi_openweather(lat: float, lng: float) -> Optional[Dict[str, Any]]:
+    """Fetch real-time air quality from OpenWeatherMap Air Pollution API."""
+    key = _get_openweather_key()
+    if not key:
+        return None
+    try:
+        url = "http://api.openweathermap.org/data/2.5/air_pollution"
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.get(url, params={"lat": lat, "lon": lng, "appid": key})
+            if resp.status_code == 200:
+                data = resp.json()
+                results = data.get("list", [])
+                if results:
+                    item = results[0]
+                    components = item.get("components", {})
+                    
+                    pm25 = components.get("pm2_5", 0.0) or 0.0
+                    pm10 = components.get("pm10", 0.0) or 0.0
+                    no2 = components.get("no2", 0.0) or 0.0
+                    so2 = components.get("so2", 0.0) or 0.0
+                    # OpenWeatherMap returns CO in µg/m³, but CPCB/Indian AQI calculation expects mg/m³
+                    co = (components.get("co", 0.0) or 0.0) / 1000.0
+                    o3 = components.get("o3", 0.0) or 0.0
+                    
+                    aqi_in = calculate_indian_aqi(pm25, pm10, no2, so2, co, o3)
+                    
+                    return {
+                        "aqi": round(aqi_in, 1),
+                        "pm25": round(pm25, 1),
+                        "pm10": round(pm10, 1),
+                        "no2": round(no2, 1),
+                        "so2": round(so2, 1),
+                        "co": round(co, 2),
+                        "o3": round(o3, 1),
+                        "source": "open-weather (live)"
+                    }
+    except Exception as e:
+        print(f"OpenWeather fetch failed for ({lat:.4f},{lng:.4f}): {e}")
+    return None
+
+
 # ── WAQI API (Hugging Face / CPCB Ground Stations) ───────────────────────────
 
 def _get_waqi_token() -> Optional[str]:
@@ -403,11 +466,13 @@ def _us_aqi_to_pm10(aqi_val: float) -> float:
 
 
 async def _fetch_real_aqi(lat: float, lng: float) -> Optional[Dict[str, Any]]:
-    """Fetch real-time air quality. Uses Open-Meteo's pre-computed US AQI
-    (which is based on their CAMS model) directly, since CAMS raw pollutant
-    concentrations are known to be heavily inflated for India.
-    Falls back to OpenAQ ground stations, then WAQI."""
-    # 1. Attempt Open-Meteo CAMS Air Quality API — use US AQI directly
+    """Fetch real-time air quality. Uses OpenWeatherMap first, then falls back to Open-Meteo with corrections."""
+    # 0. Attempt OpenWeatherMap
+    owm_data = await _fetch_real_aqi_openweather(lat, lng)
+    if owm_data:
+        return owm_data
+
+    # 1. Attempt Open-Meteo CAMS Air Quality API
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(AQ_API_URL, params={
@@ -426,18 +491,23 @@ async def _fetch_real_aqi(lat: float, lng: float) -> Optional[Dict[str, Any]]:
                 o3_raw = data.get("ozone", 0)
 
                 if us_aqi is not None:
-                    # Use the US AQI directly as our AQI value.
-                    # Back-derive realistic pollutant display values from AQI sub-indices
-                    # so the displayed concentrations are consistent with the AQI score.
-                    us_pm25_aqi = data.get("us_aqi_pm2_5", us_aqi)
-                    us_pm10_aqi = data.get("us_aqi_pm10", 0)
-                    pm25_display = _us_aqi_to_pm25(us_pm25_aqi)
-                    pm10_display = _us_aqi_to_pm10(us_pm10_aqi)
+                    # Apply dynamic calibration correction for CAMS model overestimation in India.
+                    # Overestimation scales with concentration: low values are accurate, high values are overestimated.
+                    if pm25_raw > 20.0:
+                        correction = min(1.0, max(0.2, 20.0 / pm25_raw + 0.15))
+                        pm25_cal = pm25_raw * correction
+                    else:
+                        pm25_cal = pm25_raw
+                    
+                    # PM10/PM2.5 ratio in urban areas is physically capped (dust/combustion mix)
+                    pm10_cal = min(pm10_raw, pm25_cal * 2.2)
+
+                    aqi_val = calculate_indian_aqi(pm25_cal, pm10_cal, no2_raw, so2_raw, co_raw, o3_raw)
 
                     return {
-                        "aqi": round(float(us_aqi), 1),
-                        "pm25": round(pm25_display, 1),
-                        "pm10": round(pm10_display, 1),
+                        "aqi": round(aqi_val, 1),
+                        "pm25": round(pm25_cal, 1),
+                        "pm10": round(pm10_cal, 1),
                         "no2": round(no2_raw, 1),
                         "so2": round(so2_raw, 1),
                         "co": round(co_raw, 2),
@@ -445,12 +515,19 @@ async def _fetch_real_aqi(lat: float, lng: float) -> Optional[Dict[str, Any]]:
                         "source": "open-meteo (live)",
                     }
                 else:
-                    # Fallback: no us_aqi field, use raw with Indian AQI calc
-                    aqi_val = calculate_indian_aqi(pm25_raw, pm10_raw, no2_raw, so2_raw, co_raw, o3_raw)
+                    # Fallback: no us_aqi field, use corrected raw with Indian AQI calc
+                    if pm25_raw > 20.0:
+                        correction = min(1.0, max(0.2, 20.0 / pm25_raw + 0.15))
+                        pm25_cal = pm25_raw * correction
+                    else:
+                        pm25_cal = pm25_raw
+                    pm10_cal = min(pm10_raw, pm25_cal * 2.2)
+
+                    aqi_val = calculate_indian_aqi(pm25_cal, pm10_cal, no2_raw, so2_raw, co_raw, o3_raw)
                     return {
                         "aqi": round(aqi_val, 1),
-                        "pm25": round(pm25_raw, 1),
-                        "pm10": round(pm10_raw, 1),
+                        "pm25": round(pm25_cal, 1),
+                        "pm10": round(pm10_cal, 1),
                         "no2": round(no2_raw, 1),
                         "so2": round(so2_raw, 1),
                         "co": round(co_raw, 2),
@@ -915,18 +992,21 @@ class SimulationEngine:
                         co_raw = (curr.get("carbon_monoxide", 0) or 0) / 1000.0
                         o3_raw = curr.get("ozone", 0) or 0
 
-                        if us_aqi is not None:
-                            aqi_in = float(us_aqi)
-                            pm25_display = _us_aqi_to_pm25(us_pm25_aqi)
-                            pm10_display = _us_aqi_to_pm10(us_pm10_aqi)
+                        pm25_raw = curr.get("pm2_5", 15.0) or 15.0
+                        pm10_raw = curr.get("pm10", 30.0) or 30.0
+
+                        if pm25_raw > 20.0:
+                            correction = min(1.0, max(0.2, 20.0 / pm25_raw + 0.15))
+                            pm25_cal = pm25_raw * correction
                         else:
-                            pm25_display = curr.get("pm2_5", 15.0) or 15.0
-                            pm10_display = curr.get("pm10", 30.0) or 30.0
-                            aqi_in = calculate_indian_aqi(pm25_display, pm10_display, no2_raw, so2_raw, co_raw, o3_raw)
+                            pm25_cal = pm25_raw
+
+                        pm10_cal = min(pm10_raw, pm25_cal * 2.2)
+                        aqi_in = calculate_indian_aqi(pm25_cal, pm10_cal, no2_raw, so2_raw, co_raw, o3_raw)
 
                         pollutants = {
-                            "pm25": round(pm25_display, 1),
-                            "pm10": round(pm10_display, 1),
+                            "pm25": round(pm25_cal, 1),
+                            "pm10": round(pm10_cal, 1),
                             "no2": round(no2_raw, 1),
                             "so2": round(so2_raw, 1),
                             "co": round(co_raw, 2),
@@ -1143,17 +1223,21 @@ class SimulationEngine:
                     co_arr = f_data.get("carbon_monoxide", [])
                     
                     if h < len(times):
-                        us_aqi_val = us_aqi_arr[h] if h < len(us_aqi_arr) else None
-                        if us_aqi_val is not None:
-                            aqi_in = float(us_aqi_val)
+                        pm25 = pm25_arr[h] or 0.0
+                        pm10 = pm10_arr[h] or 0.0
+                        no2 = no2_arr[h] or 0.0
+                        so2 = so2_arr[h] or 0.0
+                        o3 = o3_arr[h] or 0.0
+                        co = (co_arr[h] or 0.0) / 1000.0
+
+                        if pm25 > 20.0:
+                            correction = min(1.0, max(0.2, 20.0 / pm25 + 0.15))
+                            pm25_cal = pm25 * correction
                         else:
-                            pm25 = pm25_arr[h] or 0.0
-                            pm10 = pm10_arr[h] or 0.0
-                            no2 = no2_arr[h] or 0.0
-                            so2 = so2_arr[h] or 0.0
-                            o3 = o3_arr[h] or 0.0
-                            co = (co_arr[h] or 0.0) / 1000.0
-                            aqi_in = calculate_indian_aqi(pm25, pm10, no2, so2, co, o3)
+                            pm25_cal = pm25
+                        pm10_cal = min(pm10, pm25_cal * 2.2)
+
+                        aqi_in = calculate_indian_aqi(pm25_cal, pm10_cal, no2, so2, co, o3)
                     else:
                         aqi_in = 50.0
                         
@@ -1242,17 +1326,21 @@ class SimulationEngine:
             co_arr = forecast_data.get("carbon_monoxide", [])
 
             for h in range(min(hours, len(times))):
-                us_aqi_val = us_aqi_arr[h] if h < len(us_aqi_arr) else None
-                if us_aqi_val is not None:
-                    aqi_in = float(us_aqi_val)
+                pm25 = pm25_arr[h] or 0.0
+                pm10 = pm10_arr[h] or 0.0
+                no2 = no2_arr[h] or 0.0
+                so2 = so2_arr[h] or 0.0
+                o3 = o3_arr[h] or 0.0
+                co = (co_arr[h] or 0.0) / 1000.0
+
+                if pm25 > 20.0:
+                    correction = min(1.0, max(0.2, 20.0 / pm25 + 0.15))
+                    pm25_cal = pm25 * correction
                 else:
-                    pm25 = pm25_arr[h] or 0.0
-                    pm10 = pm10_arr[h] or 0.0
-                    no2 = no2_arr[h] or 0.0
-                    so2 = so2_arr[h] or 0.0
-                    o3 = o3_arr[h] or 0.0
-                    co = (co_arr[h] or 0.0) / 1000.0
-                    aqi_in = calculate_indian_aqi(pm25, pm10, no2, so2, co, o3)
+                    pm25_cal = pm25
+                pm10_cal = min(pm10, pm25_cal * 2.2)
+
+                aqi_in = calculate_indian_aqi(pm25_cal, pm10_cal, no2, so2, co, o3)
 
                 rng_wind = random.Random(hash(f"{city_key}_fc_{h}"))
                 ws = rng_wind.uniform(1.5, 6.0)
