@@ -5,7 +5,7 @@ import asyncio
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Tuple, Optional
 from sklearn.ensemble import GradientBoostingRegressor
-from simulation import CITIES, DEFAULT_CITY, LIVE_CITIES, calculate_indian_aqi
+from simulation import CITIES, DEFAULT_CITY, LIVE_CITIES, calculate_indian_aqi, _us_aqi_to_pm25, _us_aqi_to_pm10
 
 logger = logging.getLogger("AQIForecaster")
 
@@ -29,7 +29,7 @@ class AQIForecaster:
         aq_params = {
             "latitude": lat,
             "longitude": lng,
-            "hourly": "pm2_5,pm10,nitrogen_dioxide,sulphur_dioxide,ozone,carbon_monoxide",
+            "hourly": "pm2_5,pm10,nitrogen_dioxide,sulphur_dioxide,ozone,carbon_monoxide,us_aqi_pm2_5,us_aqi_pm10",
             "start_date": start_str,
             "end_date": end_str
         }
@@ -79,19 +79,27 @@ class AQIForecaster:
             if not times:
                 return None
 
-            from simulation import get_indian_seasonal_calibration
-            factor = get_indian_seasonal_calibration(lat, lng)
-            gas_factor = max(0.5, factor) if factor < 1.0 else factor
+            # Process PM2.5 and PM10 via reverse mapping of US AQI sub-indices to get realistic ground truth
+            raw_us_pm25 = aq_data.get("us_aqi_pm2_5", [])
+            raw_us_pm10 = aq_data.get("us_aqi_pm10", [])
+            
+            pm25_list = []
+            pm10_list = []
+            for idx in range(len(times)):
+                us_pm25_val = raw_us_pm25[idx] if idx < len(raw_us_pm25) and raw_us_pm25[idx] is not None else 0.0
+                us_pm10_val = raw_us_pm10[idx] if idx < len(raw_us_pm10) and raw_us_pm10[idx] is not None else 0.0
+                pm25_list.append(_us_aqi_to_pm25(us_pm25_val))
+                pm10_list.append(_us_aqi_to_pm10(us_pm10_val))
 
             # Merge data into one dict
             merged = {
                 "time": times,
-                "pm2_5": [v * factor if v is not None else 0.0 for v in aq_data.get("pm2_5", [])],
-                "pm10": [v * factor if v is not None else 0.0 for v in aq_data.get("pm10", [])],
-                "no2": [v * gas_factor if v is not None else 0.0 for v in aq_data.get("nitrogen_dioxide", [])],
-                "so2": [v * gas_factor if v is not None else 0.0 for v in aq_data.get("sulphur_dioxide", [])],
-                "o3": [v * gas_factor if v is not None else 0.0 for v in aq_data.get("ozone", [])],
-                "co": [co * gas_factor / 1000.0 if co is not None else 0.0 for co in aq_data.get("carbon_monoxide", [])], # convert ug/m3 to mg/m3
+                "pm2_5": pm25_list,
+                "pm10": pm10_list,
+                "no2": [v if v is not None else 0.0 for v in aq_data.get("nitrogen_dioxide", [])],
+                "so2": [v if v is not None else 0.0 for v in aq_data.get("sulphur_dioxide", [])],
+                "o3": [v if v is not None else 0.0 for v in aq_data.get("ozone", [])],
+                "co": [co / 1000.0 if co is not None else 0.0 for co in aq_data.get("carbon_monoxide", [])], # convert ug/m3 to mg/m3
                 "temp": weather_data.get("temperature_2m", []),
                 "humidity": weather_data.get("relative_humidity_2m", []),
                 "wind_speed": weather_data.get("wind_speed_10m", []),
