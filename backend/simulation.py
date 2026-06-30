@@ -316,11 +316,13 @@ async def _fetch_real_aqi_openweather(lat: float, lng: float) -> Optional[Dict[s
                     
                     pm25_raw = components.get("pm2_5", 0.0) or 0.0
                     pm10_raw = components.get("pm10", 0.0) or 0.0
-                    no2 = components.get("no2", 0.0) or 0.0
-                    so2 = components.get("so2", 0.0) or 0.0
                     # OpenWeatherMap returns CO in µg/m³, but CPCB/Indian AQI calculation expects mg/m³
                     co = (components.get("co", 0.0) or 0.0) / 1000.0
-                    o3 = components.get("o3", 0.0) or 0.0
+                    
+                    # Apply gas scaling factors to correct global model overestimations for ground-level AQI in India
+                    no2 = (components.get("no2", 0.0) or 0.0) * 0.5
+                    so2 = (components.get("so2", 0.0) or 0.0) * 0.2
+                    o3 = (components.get("o3", 0.0) or 0.0) * 0.35
                     
                     # Gentle CAMS calibration: CAMS overestimates by ~30% above 30µg/m³
                     # Below 30µg/m³ the model is accurate, so we trust the raw value.
@@ -531,10 +533,11 @@ async def _fetch_real_aqi(lat: float, lng: float) -> Optional[Dict[str, Any]]:
                 us_aqi = data.get("us_aqi", None)
                 pm25_raw = data.get("pm2_5", 0)
                 pm10_raw = data.get("pm10", 0)
-                no2_raw = data.get("nitrogen_dioxide", 0)
-                so2_raw = data.get("sulphur_dioxide", 0)
+                # Apply gas scaling factors to correct global model overestimations for ground-level AQI in India
+                no2_raw = data.get("nitrogen_dioxide", 0) * 0.5
+                so2_raw = data.get("sulphur_dioxide", 0) * 0.2
                 co_raw = data.get("carbon_monoxide", 0) / 1000.0  # µg/m³ → mg/m³
-                o3_raw = data.get("ozone", 0)
+                o3_raw = data.get("ozone", 0) * 0.35
 
                 if us_aqi is not None:
                     # Gentle CAMS calibration: CAMS overestimates by ~30% above 30µg/m³
@@ -1203,9 +1206,10 @@ class SimulationEngine:
                     if h < len(times):
                         pm25 = pm25_arr[h] or 0.0
                         pm10 = pm10_arr[h] or 0.0
-                        no2 = no2_arr[h] or 0.0
-                        so2 = so2_arr[h] or 0.0
-                        o3 = o3_arr[h] or 0.0
+                        # Apply gas scaling factors to correct global model overestimations for ground-level AQI in India
+                        no2 = (no2_arr[h] or 0.0) * 0.5
+                        so2 = (so2_arr[h] or 0.0) * 0.2
+                        o3 = (o3_arr[h] or 0.0) * 0.35
                         co = (co_arr[h] or 0.0) / 1000.0
 
                         if pm25 > 30.0:
@@ -1305,9 +1309,10 @@ class SimulationEngine:
             for h in range(min(hours, len(times))):
                 pm25 = pm25_arr[h] or 0.0
                 pm10 = pm10_arr[h] or 0.0
-                no2 = no2_arr[h] or 0.0
-                so2 = so2_arr[h] or 0.0
-                o3 = o3_arr[h] or 0.0
+                # Apply gas scaling factors to correct global model overestimations for ground-level AQI in India
+                no2 = (no2_arr[h] or 0.0) * 0.5
+                so2 = (so2_arr[h] or 0.0) * 0.2
+                o3 = (o3_arr[h] or 0.0) * 0.35
                 co = (co_arr[h] or 0.0) / 1000.0
 
                 if pm25 > 30.0:
