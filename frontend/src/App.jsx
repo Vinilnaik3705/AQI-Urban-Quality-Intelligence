@@ -3132,6 +3132,27 @@ function CitizensAdvisoryPopup({
   const [nearbyPlaces, setNearbyPlaces] = useState(null)
   const [nearbyLoading, setNearbyLoading] = useState(false)
 
+  // Fallback Address & Phone Helpers for real resources
+  const getHospitalPhone = (p) => {
+    if (p.phone) return p.phone;
+    return "Emergency: 108 / 112";
+  };
+
+  const getHospitalAddress = (p) => {
+    if (p.address) return p.address;
+    return `Near ${advisory ? advisory.ward_name : 'Delhi'} (Coordinates: ${p.lat.toFixed(4)}, ${p.lng.toFixed(4)})`;
+  };
+
+  const getPharmacyPhone = (p) => {
+    if (p.phone) return p.phone;
+    return "Emergency Helpline: 112";
+  };
+
+  const getPharmacyAddress = (p) => {
+    if (p.address) return p.address;
+    return `Near ${advisory ? advisory.ward_name : 'Delhi'} (Coordinates: ${p.lat.toFixed(4)}, ${p.lng.toFixed(4)})`;
+  };
+
   // AI Health Assistant States & Function
   const [aiQuestion, setAiQuestion] = useState('')
   const [aiLang, setAiLang] = useState(lang || 'en')
@@ -3189,8 +3210,14 @@ function CitizensAdvisoryPopup({
         const places = (data.elements || []).map(el => ({
           name: el.tags?.name || (el.tags?.amenity === 'hospital' ? 'Hospital' : 'Medical Store'),
           type: el.tags?.amenity === 'hospital' ? 'hospital' : 'pharmacy',
-          phone: el.tags?.phone || el.tags?.['contact:phone'] || null,
-          address: [el.tags?.['addr:street'], el.tags?.['addr:city']].filter(Boolean).join(', ') || null,
+          phone: el.tags?.phone || el.tags?.['contact:phone'] || el.tags?.['phone:mobile'] || el.tags?.['contact:mobile'] || null,
+          address: el.tags?.['addr:full'] || 
+                   [
+                     el.tags?.['addr:housenumber'] || el.tags?.['addr:housename'],
+                     el.tags?.['addr:street'],
+                     el.tags?.['addr:suburb'] || el.tags?.['addr:neighbourhood'] || el.tags?.['addr:place'],
+                     el.tags?.['addr:city']
+                   ].filter(Boolean).join(', ') || null,
           lat: el.lat,
           lng: el.lon,
         }))
@@ -3310,13 +3337,12 @@ function CitizensAdvisoryPopup({
                 <div style={{ 
                   marginTop: '16px', 
                   padding: '14px 16px', 
-                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.65))', 
-                  backdropFilter: 'blur(8px)',
-                  borderRadius: '12px', 
+                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.3))', 
+                  backdropFilter: 'blur(16px)',
+                  borderRadius: '16px', 
                   fontSize: '13.5px', 
-                  boxShadow: '0 8px 32px 0 rgba(225, 29, 72, 0.03)',
-                  border: '1px solid rgba(254, 205, 211, 0.8)',
-                  borderLeft: `5px solid ${getAqiColor(advisory.aqi)}`,
+                  boxShadow: '0 8px 32px 0 rgba(225, 29, 72, 0.04)',
+                  border: '1.5px solid rgba(254, 205, 211, 0.6)',
                   color: '#334155',
                   lineHeight: '1.5',
                 }}>
@@ -3500,10 +3526,10 @@ function CitizensAdvisoryPopup({
                           <div style={{ marginBottom: '8px' }}>
                             <div style={{ fontSize: '11px', fontWeight: '600', color: '#e11d48', textTransform: 'uppercase', marginBottom: '4px' }}>Hospitals</div>
                             {nearbyPlaces.filter(p => p.type === 'hospital').slice(0, 2).map((p, i) => (
-                              <div key={`ai-h-${i}`} style={{ background: '#ffffff', padding: '6px 8px', borderRadius: '8px', border: '1px solid #ffe4e6', marginBottom: '4px' }}>
-                                <div style={{ fontWeight: '600', color: '#1e293b', fontSize: '12px' }}>{p.name}</div>
-                                {p.address && <div style={{ fontSize: '11px', color: '#64748b' }}>{p.address}</div>}
-                                {p.phone && <div style={{ fontSize: '11px', color: '#e11d48', fontWeight: '600' }}>{p.phone}</div>}
+                              <div key={`ai-h-${i}`} style={{ background: '#ffffff', padding: '8px 10px', borderRadius: '8px', border: '1px solid #ffe4e6', marginBottom: '6px' }}>
+                                <div style={{ fontWeight: '600', color: '#1e293b', fontSize: '12.5px' }}>{p.name}</div>
+                                <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}><MapPin size={11} color="#94a3b8" /> {getHospitalAddress(p, i)}</div>
+                                <div style={{ fontSize: '11.5px', color: '#e11d48', fontWeight: '600', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}><Phone size={11} color="#e11d48" /> {getHospitalPhone(p, i)}</div>
                               </div>
                             ))}
                           </div>
@@ -3514,10 +3540,10 @@ function CitizensAdvisoryPopup({
                           <div>
                             <div style={{ fontSize: '11px', fontWeight: '600', color: '#16a34a', textTransform: 'uppercase', marginBottom: '4px' }}>Medical Stores</div>
                             {nearbyPlaces.filter(p => p.type === 'pharmacy').slice(0, 2).map((p, i) => (
-                              <div key={`ai-p-${i}`} style={{ background: '#ffffff', padding: '6px 8px', borderRadius: '8px', border: '1px solid #ffe4e6', marginBottom: '4px' }}>
-                                <div style={{ fontWeight: '600', color: '#1e293b', fontSize: '12px' }}>{p.name}</div>
-                                {p.address && <div style={{ fontSize: '11px', color: '#64748b' }}>{p.address}</div>}
-                                {p.phone && <div style={{ fontSize: '11px', color: '#16a34a', fontWeight: '600' }}>{p.phone}</div>}
+                              <div key={`ai-p-${i}`} style={{ background: '#ffffff', padding: '8px 10px', borderRadius: '8px', border: '1px solid #ffe4e6', marginBottom: '6px' }}>
+                                <div style={{ fontWeight: '600', color: '#1e293b', fontSize: '12.5px' }}>{p.name}</div>
+                                <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}><MapPin size={11} color="#94a3b8" /> {getPharmacyAddress(p, i)}</div>
+                                <div style={{ fontSize: '11.5px', color: '#16a34a', fontWeight: '600', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}><Phone size={11} color="#16a34a" /> {getPharmacyPhone(p, i)}</div>
                               </div>
                             ))}
                           </div>
