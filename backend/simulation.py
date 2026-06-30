@@ -931,131 +931,62 @@ class SimulationEngine:
             live_keys = [k for k in keys if k in LIVE_CITIES and "_" not in k]
             other_keys = [k for k in keys if k not in LIVE_CITIES or "_" in k]
             
-            # Divide live keys into batches of 40 to avoid slow Open-Meteo responses
-            batch_size = 40
-            batches = [live_keys[i:i + batch_size] for i in range(0, len(live_keys), batch_size)]
-            
-            async def fetch_batch(batch_keys):
-                batch_lats = [str(CITIES[k]["center"][0]) for k in batch_keys]
-                batch_lngs = [str(CITIES[k]["center"][1]) for k in batch_keys]
-                url = "https://air-quality-api.open-meteo.com/v1/air-quality"
-                params = {
-                    "latitude": ",".join(batch_lats),
-                    "longitude": ",".join(batch_lngs),
-                    "current": "us_aqi,us_aqi_pm2_5,us_aqi_pm10,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone",
-                }
-                async with httpx.AsyncClient(timeout=25.0) as client:
-                    resp = await client.get(url, params=params)
-                    if resp.status_code == 200:
-                        return resp.json()
-                return []
- 
             live_readings_map = {}
-            try:
-                results_batches = await asyncio.gather(*(fetch_batch(b) for b in batches), return_exceptions=True)
+            
+            async def fetch_city_reading(k, idx):
+                await asyncio.sleep(idx * 0.15)  # Stagger requests to prevent API burst limit blocks
+                lat_k, lng_k = CITIES[k]["center"]
+                aq_data = await _fetch_real_aqi(lat_k, lng_k)
+                if aq_data:
+                    pollutants = {
+                        "pm25": aq_data["pm25"], "pm10": aq_data["pm10"], "no2": aq_data["no2"],
+                        "so2": aq_data["so2"], "co": aq_data["co"], "o3": aq_data["o3"]
+                    }
+                    aqi_in = aq_data["aqi"]
+                    source = aq_data["source"]
+                else:
+                    pollutants = {"pm25": 15.0, "pm10": 30.0, "no2": 10.0, "so2": 5.0, "co": 0.3, "o3": 20.0}
+                    aqi_in = 40.0
+                    source = "estimation (fallback)"
                 
-                for batch_keys, batch_result in zip(batches, results_batches):
-                    if isinstance(batch_result, Exception) or not batch_result:
-                        print("Error fetching batch:", batch_result)
-                        # Fallback for this batch on-demand
-                        for k in batch_keys:
-                            lat_k, lng_k = CITIES[k]["center"]
-                            aq_data = await _fetch_real_aqi(lat_k, lng_k)
-                            if aq_data:
-                                pollutants = {
-                                    "pm25": aq_data["pm25"], "pm10": aq_data["pm10"], "no2": aq_data["no2"],
-                                    "so2": aq_data["so2"], "co": aq_data["co"], "o3": aq_data["o3"]
-                                }
-                                aqi_in = aq_data["aqi"]
-                                source = aq_data["source"]
-                            else:
-                                pollutants = {"pm25": 15.0, "pm10": 30.0, "no2": 10.0, "so2": 5.0, "co": 0.3, "o3": 20.0}
-                                aqi_in = 40.0
-                                source = "estimation (fallback)"
-                            r_entry = {
-                                "sensor_id": f"SENSOR_{k}",
-                                "ward_id": k,
-                                "location": CITIES[k]["center"],
-                                "timestamp": ts.isoformat(),
-                                "aqi": round(aqi_in, 1),
-                                "aqi_in": round(aqi_in, 1),
-                                "pollutants": pollutants,
-                                "source": source
-                            }
-                            readings.append(r_entry)
-                            live_readings_map[k] = r_entry
-                        continue
-                    
-                    items = batch_result if isinstance(batch_result, list) else [batch_result]
-                    for k, item in zip(batch_keys, items):
-                        # Calculate procedural wind for wind display
-                        h_seed = ts.hour + ts.minute // 10
-                        rng_wind = random.Random(hash(f"{k}_{h_seed}"))
-                        ws = rng_wind.uniform(1.5, 6.0)  # wind speed in m/s
-                        wd = rng_wind.uniform(0.0, 360.0)  # wind direction in degrees
-                        self._cache[f"wind_{k}"] = (ws, wd)
- 
-                        curr = item.get("current", {})
-                        us_aqi = curr.get("us_aqi", None)
-                        us_pm25_aqi = curr.get("us_aqi_pm2_5", 0)
-                        us_pm10_aqi = curr.get("us_aqi_pm10", 0)
-                        no2_raw = curr.get("nitrogen_dioxide", 0) or 0
-                        so2_raw = curr.get("sulphur_dioxide", 0) or 0
-                        co_raw = (curr.get("carbon_monoxide", 0) or 0) / 1000.0
-                        o3_raw = curr.get("ozone", 0) or 0
+                # Calculate procedural wind
+                h_seed = ts.hour + ts.minute // 10
+                rng_wind = random.Random(hash(f"{k}_{h_seed}"))
+                ws = rng_wind.uniform(1.5, 6.0)
+                wd = rng_wind.uniform(0.0, 360.0)
+                self._cache[f"wind_{k}"] = (ws, wd)
 
-                        pm25_raw = curr.get("pm2_5", 15.0) or 15.0
-                        pm10_raw = curr.get("pm10", 30.0) or 30.0
+                return {
+                    "sensor_id": f"SENSOR_{k}",
+                    "ward_id": k,
+                    "location": CITIES[k]["center"],
+                    "timestamp": ts.isoformat(),
+                    "aqi": round(aqi_in, 1),
+                    "aqi_in": round(aqi_in, 1),
+                    "pollutants": pollutants,
+                    "source": source
+                }
 
-                        if pm25_raw > 20.0:
-                            correction = min(1.0, max(0.2, 20.0 / pm25_raw + 0.15))
-                            pm25_cal = pm25_raw * correction
-                        else:
-                            pm25_cal = pm25_raw
-
-                        pm10_cal = min(pm10_raw, pm25_cal * 2.2)
-                        aqi_in = calculate_indian_aqi(pm25_cal, pm10_cal, no2_raw, so2_raw, co_raw, o3_raw)
-
-                        pollutants = {
-                            "pm25": round(pm25_cal, 1),
-                            "pm10": round(pm10_cal, 1),
-                            "no2": round(no2_raw, 1),
-                            "so2": round(so2_raw, 1),
-                            "co": round(co_raw, 2),
-                            "o3": round(o3_raw, 1),
-                        }
-                        source = "open-meteo (live)"
-
+            try:
+                results = await asyncio.gather(*(fetch_city_reading(k, idx) for idx, k in enumerate(live_keys)), return_exceptions=True)
+                for k, r_entry in zip(live_keys, results):
+                    if isinstance(r_entry, Exception) or not r_entry:
+                        print(f"Error fetching live city {k}:", r_entry)
+                        pollutants = {"pm25": 15.0, "pm10": 30.0, "no2": 10.0, "so2": 5.0, "co": 0.3, "o3": 20.0}
                         r_entry = {
                             "sensor_id": f"SENSOR_{k}",
                             "ward_id": k,
                             "location": CITIES[k]["center"],
                             "timestamp": ts.isoformat(),
-                            "aqi": round(aqi_in, 1),
-                            "aqi_in": round(aqi_in, 1),
+                            "aqi": 40.0,
+                            "aqi_in": 40.0,
                             "pollutants": pollutants,
-                            "source": source
+                            "source": "estimation (fallback)"
                         }
-                        readings.append(r_entry)
-                        live_readings_map[k] = r_entry
-
-
-            except Exception as e:
-                print("Error batch fetching global cities:", e)
-                for k in live_keys:
-                    pollutants = {"pm25": 30.0, "pm10": 60.0, "no2": 25.0, "so2": 8.0, "co": 0.6, "o3": 45.0}
-                    r_entry = {
-                        "sensor_id": f"SENSOR_{k}",
-                        "ward_id": k,
-                        "location": CITIES[k]["center"],
-                        "timestamp": ts.isoformat(),
-                        "aqi": 80.0,
-                        "aqi_in": 80.0,
-                        "pollutants": pollutants,
-                        "source": "estimation (fallback)"
-                    }
                     readings.append(r_entry)
                     live_readings_map[k] = r_entry
+            except Exception as e:
+                print("Error in parallel city fetch:", e)
 
             # Process other cities using nearest-neighbor fallback
             active_keys = list(live_readings_map.keys())
