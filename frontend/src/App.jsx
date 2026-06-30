@@ -325,8 +325,17 @@ export default function App() {
           <svg viewBox="0 0 500 150" className="aqify-svg">
             <defs>
               <clipPath id="wave-clip">
-                <g style={{ transform: `translate3d(0, ${110 - progress * 1.3}px, 0)` }}>
-                  <path className="wave-shape" d="M 0 0 Q 125 -15 250 0 T 500 0 T 750 0 T 1000 0 L 1000 200 L 0 200 Z" />
+                <g transform={`translate(0, ${110 - progress * 1.3})`}>
+                  <path className="wave-shape" d="M 0 0 Q 125 -15 250 0 T 500 0 T 750 0 T 1000 0 L 1000 200 L 0 200 Z">
+                    <animateTransform 
+                      attributeName="transform" 
+                      type="translate" 
+                      from="0,0" 
+                      to="-500,0" 
+                      dur="2.5s" 
+                      repeatCount="indefinite" 
+                    />
+                  </path>
                 </g>
               </clipPath>
             </defs>
