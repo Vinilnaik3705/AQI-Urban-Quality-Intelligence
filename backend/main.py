@@ -629,10 +629,14 @@ Current Context:
 
 User's Question: "{question}"
 
-Please provide a highly professional, helpful, and easy-to-understand response in the language '{lang_name}' (language code: '{lang}'). 
-Address their specific question directly. 
-Include practical safety precautions and health advice tailored to the current AQI level of {aqi}. 
-Keep your answer clear and concise (under 4 sentences). Do not use markdown tags other than bold text if needed.
+Please provide your response in the language '{lang_name}' (language code: '{lang}').
+Address their specific question directly.
+
+Format your output EXACTLY as a JSON object with these keys:
+"response": "<A highly professional, helpful, and easy-to-understand response in {lang_name} addressing their question. Length: 2-3 sentences>"
+"precautions": ["<Specific precaution 1 in {lang_name} based on their question>", "<Specific precaution 2 in {lang_name} based on their question>"]
+
+IMPORTANT: Return ONLY the raw JSON object. Do not wrap it in markdown block quotes or include backticks like ```json.
 """
 
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_api_key}"
@@ -648,11 +652,37 @@ Keep your answer clear and concise (under 4 sentences). Do not use markdown tags
             if resp.status_code == 200:
                 res_data = resp.json()
                 text_response = res_data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                return {"response": text_response}
+                
+                # Robust JSON parsing helper
+                if text_response.startswith("```"):
+                    text_response = text_response.split("```")[1]
+                    if text_response.startswith("json"):
+                        text_response = text_response[4:]
+                text_response = text_response.strip()
+                
+                try:
+                    import json
+                    parsed = json.loads(text_response)
+                    return {
+                        "response": parsed.get("response", ""),
+                        "precautions": parsed.get("precautions", [])
+                    }
+                except Exception:
+                    # Fallback if JSON parsing fails
+                    return {
+                        "response": text_response,
+                        "precautions": []
+                    }
             else:
-                return {"response": f"Gemini API Error: received status code {resp.status_code}"}
+                return {
+                    "response": f"Gemini API Error: received status code {resp.status_code}",
+                    "precautions": []
+                }
     except Exception as e:
-        return {"response": f"Error communicating with Gemini: {str(e)}"}
+        return {
+            "response": f"Error communicating with Gemini: {str(e)}",
+            "precautions": []
+        }
 
 
 # ── Email Alert Subscriptions (SQLite + Resend) ──────────────────────────────

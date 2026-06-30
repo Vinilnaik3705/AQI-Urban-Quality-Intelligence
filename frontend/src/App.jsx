@@ -3116,18 +3116,6 @@ const precautionTranslations = {
   }
 };
 
-function getPrecautionIcon(precautionText) {
-  const text = precautionText.toLowerCase();
-  if (text.includes('mask')) return <Shield size={16} color="#3b82f6" style={{ marginRight: '8px' }} />;
-  if (text.includes('indoor') || text.includes('inside') || text.includes('window') || text.includes('stay home')) return <Building2 size={16} color="#3b82f6" style={{ marginRight: '8px' }} />;
-  if (text.includes('purifier') || text.includes('filtration')) return <Wind size={16} color="#10b981" style={{ marginRight: '8px' }} />;
-  if (text.includes('exercise') || text.includes('outdoor') || text.includes('sport') || text.includes('jogging') || text.includes('activity')) return <XCircle size={16} color="#ef4444" style={{ marginRight: '8px' }} />;
-  if (text.includes('water') || text.includes('hydrate') || text.includes('fluid') || text.includes('drink')) return <Activity size={16} color="#3b82f6" style={{ marginRight: '8px' }} />;
-  if (text.includes('doctor') || text.includes('hospital') || text.includes('medical') || text.includes('symptom') || text.includes('health') || text.includes('physician')) return <Heart size={16} color="#ef4444" style={{ marginRight: '8px' }} />;
-  if (text.includes('elder') || text.includes('senior') || text.includes('child') || text.includes('kid') || text.includes('baby') || text.includes('pregnant')) return <Users size={16} color="#f59e0b" style={{ marginRight: '8px' }} />;
-  return <AlertTriangle size={16} color="#f59e0b" style={{ marginRight: '8px' }} />;
-}
-
 function CitizensAdvisoryPopup({ 
   state, 
   advisory, 
@@ -3147,7 +3135,7 @@ function CitizensAdvisoryPopup({
   // AI Health Assistant States & Function
   const [aiQuestion, setAiQuestion] = useState('')
   const [aiLang, setAiLang] = useState(lang || 'en')
-  const [aiResponse, setAiResponse] = useState('')
+  const [aiResponseData, setAiResponseData] = useState(null)
   const [aiLoading, setAiLoading] = useState(false)
 
   // Sync AI language choice if user changes main lang dropdown
@@ -3160,7 +3148,7 @@ function CitizensAdvisoryPopup({
   const handleAskAi = async () => {
     if (!aiQuestion.trim()) return;
     setAiLoading(true);
-    setAiResponse('');
+    setAiResponseData(null);
     try {
       const response = await fetch('/api/health-assistant', {
         method: 'POST',
@@ -3174,9 +3162,12 @@ function CitizensAdvisoryPopup({
         })
       });
       const data = await response.json();
-      setAiResponse(data.response || 'No response from assistant.');
+      setAiResponseData(data);
     } catch (err) {
-      setAiResponse('Error communicating with AI health assistant.');
+      setAiResponseData({
+        response: 'Error communicating with AI health assistant.',
+        precautions: []
+      });
     } finally {
       setAiLoading(false);
     }
@@ -3238,7 +3229,6 @@ function CitizensAdvisoryPopup({
     pct = 100;
   }
 
-
   return (
     <div className="advisory-widget-container">
       {/* Floating Trigger Button */}
@@ -3261,36 +3251,18 @@ function CitizensAdvisoryPopup({
 
       {/* Floating Popup Card */}
       {isOpen && (
-        <div className="advisory-popup-card">
+        <div className="advisory-popup-card" style={{ background: 'rgba(255, 240, 242, 0.98)', border: '1.5px solid #fecdd3', boxShadow: '0 10px 40px rgba(225, 29, 72, 0.08)' }}>
           <div className="advisory-popup-header">
             <div>
               <div className="advisory-popup-title">
-                <Users size={18} color="#10b981" />
-                <span>Health Advisory Portal</span>
+                <Users size={18} color="#be123c" />
+                <span style={{ color: '#be123c' }}>Health Advisory Portal</span>
               </div>
-              <div className="advisory-popup-subtitle">
+              <div className="advisory-popup-subtitle" style={{ color: '#e11d48' }}>
                 Auto-generated, multi-lingual advisories based on prediction
               </div>
             </div>
-            <button className="advisory-close-btn" onClick={onToggle}>&times;</button>
-          </div>
-
-          <div style={{ padding: '12px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase' }}>Select Language</span>
-            <select 
-              value={lang} 
-              onChange={(e) => {
-                onChangeLang(e.target.value);
-                if (selectedWard) onLoadAdvisory(selectedWard.id, e.target.value, profile);
-              }}
-              style={{ fontSize: '13px', padding: '2px 6px', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#ffffff', cursor: 'pointer' }}
-            >
-              <option value="en">English</option>
-              <option value="hi">Hindi</option>
-              <option value="kn">Kannada</option>
-              <option value="ta">Tamil</option>
-              <option value="te">Telugu</option>
-            </select>
+            <button className="advisory-close-btn" style={{ color: '#be123c' }} onClick={onToggle}>&times;</button>
           </div>
 
           {/* Advisory output */}
@@ -3299,7 +3271,7 @@ function CitizensAdvisoryPopup({
               
               {/* AQI Numerical Scale & Multi-color Scale */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '4px' }}>
-                <span style={{ fontSize: '14px', fontWeight: '600', color: '#64748b' }}>{advisory.ward_name}</span>
+                <span style={{ fontSize: '14px', fontWeight: '600', color: '#be123c' }}>{advisory.ward_name}</span>
                 <span style={{ fontSize: '26px', fontWeight: '800', color: getAqiColor(advisory.aqi) }}>
                   AQI {Math.round(advisory.aqi)}
                 </span>
@@ -3323,7 +3295,7 @@ function CitizensAdvisoryPopup({
                   transition: 'left 0.3s ease-out'
                 }} />
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: '#94a3b8', marginBottom: '14px', padding: '0 2px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: '#e11d48', marginBottom: '14px', padding: '0 2px' }}>
                 <span>0</span>
                 <span>50</span>
                 <span>100</span>
@@ -3332,13 +3304,8 @@ function CitizensAdvisoryPopup({
                 <span>400</span>
                 <span>500+</span>
               </div>
-
-              {/* Main Advisory text */}
-              <div className="advisory-text" style={{ fontSize: '15px', margin: '12px 0', lineHeight: '1.5', color: '#334155' }}>
-                {advisory.advisory}
-              </div>
               
-              {/* Driver Analysis Section */}
+              {/* Analysis Section */}
               {advisory.reason && (
                 <div style={{ 
                   marginTop: '16px', 
@@ -3347,67 +3314,16 @@ function CitizensAdvisoryPopup({
                   backdropFilter: 'blur(8px)',
                   borderRadius: '12px', 
                   fontSize: '13.5px', 
-                  boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05)',
-                  border: '1px solid rgba(226, 232, 240, 0.8)',
+                  boxShadow: '0 8px 32px 0 rgba(225, 29, 72, 0.03)',
+                  border: '1px solid rgba(254, 205, 211, 0.8)',
                   borderLeft: `5px solid ${getAqiColor(advisory.aqi)}`,
                   color: '#334155',
                   lineHeight: '1.5',
                 }}>
-                  <strong style={{ color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', fontSize: '14.5px', fontWeight: '700' }}>
-                    <Search size={15} color="#3b82f6" /> Driver Analysis
+                  <strong style={{ color: '#be123c', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', fontSize: '14.5px', fontWeight: '700' }}>
+                    <Search size={15} color="#e11d48" /> Analysis
                   </strong>
                   {advisory.reason}
-                </div>
-              )}
-
-              {/* Precautions Grid of 3 Cards */}
-              <div style={{ marginTop: '16px' }}>
-                <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.5px' }}>Recommended Precautions</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                  {/* Card 1: N95 Mask */}
-                  <div style={{ padding: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                    <Shield size={18} color="#3b82f6" style={{ marginBottom: '4px' }} />
-                    <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#0f172a' }}>N95 Mask</span>
-                    <span style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', lineHeight: '1.2' }}>
-                      {advisory.precautions && advisory.precautions[0] ? advisory.precautions[0] : 'Not required'}
-                    </span>
-                  </div>
-                  {/* Card 2: Close Windows */}
-                  <div style={{ padding: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                    <Wind size={18} color="#10b981" style={{ marginBottom: '4px' }} />
-                    <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#0f172a' }}>Close Windows</span>
-                    <span style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', lineHeight: '1.2' }}>
-                      {advisory.precautions && advisory.precautions[1] ? advisory.precautions[1] : 'Windows open'}
-                    </span>
-                  </div>
-                  {/* Card 3: Avoid Exertion */}
-                  <div style={{ padding: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                    <AlertTriangle size={18} color="#f59e0b" style={{ marginBottom: '4px' }} />
-                    <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#0f172a' }}>Avoid Exertion</span>
-                    <span style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', lineHeight: '1.2' }}>
-                      {advisory.precautions && advisory.precautions[2] ? advisory.precautions[2] : 'Safe outdoors'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Bottom Green Health Tip Banner */}
-              {advisory.health_tip && (
-                <div style={{
-                  marginTop: '16px',
-                  padding: '10px 12px',
-                  background: '#f0fdf4',
-                  border: '1px solid #bbf7d0',
-                  borderRadius: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  color: '#15803d',
-                  fontSize: '13px',
-                  lineHeight: '1.4'
-                }}>
-                  <Heart size={14} color="#16a34a" style={{ flexShrink: 0 }} />
-                  <span>{advisory.health_tip}</span>
                 </div>
               )}
 
@@ -3415,14 +3331,14 @@ function CitizensAdvisoryPopup({
               <div style={{
                 marginTop: '20px',
                 padding: '16px',
-                background: 'linear-gradient(135deg, rgba(239, 246, 255, 0.9), rgba(255, 255, 255, 0.9))',
+                background: 'linear-gradient(135deg, rgba(255, 241, 242, 0.9), rgba(255, 255, 255, 0.95))',
                 borderRadius: '16px',
-                border: '1px solid rgba(59, 130, 246, 0.2)',
-                boxShadow: '0 8px 30px rgba(59, 130, 246, 0.05)',
+                border: '1px solid rgba(225, 29, 72, 0.2)',
+                boxShadow: '0 8px 30px rgba(225, 29, 72, 0.04)',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                  <span style={{ fontSize: '14.5px', fontWeight: '800', color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Sparkles size={16} color="#3b82f6" /> AI Health Assistant
+                  <span style={{ fontSize: '14.5px', fontWeight: '800', color: '#be123c', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Sparkles size={16} color="#e11d48" /> AI Health Assistant
                   </span>
                   
                   {/* Language Selector */}
@@ -3433,9 +3349,9 @@ function CitizensAdvisoryPopup({
                       fontSize: '12px',
                       padding: '3px 8px',
                       borderRadius: '8px',
-                      border: '1px solid #bfdbfe',
+                      border: '1px solid #fecdd3',
                       background: '#ffffff',
-                      color: '#1e3a8a',
+                      color: '#be123c',
                       fontWeight: '600',
                       cursor: 'pointer',
                       outline: 'none'
@@ -3467,7 +3383,7 @@ function CitizensAdvisoryPopup({
                       width: '100%',
                       padding: '10px 12px',
                       borderRadius: '12px',
-                      border: '1px solid #bfdbfe',
+                      border: '1px solid #fecdd3',
                       fontSize: '13px',
                       color: '#1e293b',
                       background: '#ffffff',
@@ -3486,7 +3402,7 @@ function CitizensAdvisoryPopup({
                       marginTop: '8px',
                       width: '100%',
                       padding: '8px 12px',
-                      background: 'linear-gradient(to right, #3b82f6, #2563eb)',
+                      background: 'linear-gradient(to right, #e11d48, #be123c)',
                       color: '#ffffff',
                       border: 'none',
                       borderRadius: '10px',
@@ -3498,7 +3414,7 @@ function CitizensAdvisoryPopup({
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '6px',
-                      boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)',
+                      boxShadow: '0 4px 12px rgba(225, 29, 72, 0.25)',
                       transition: 'all 0.2s'
                     }}
                   >
@@ -3522,110 +3438,94 @@ function CitizensAdvisoryPopup({
                 </div>
 
                 {/* AI Response Display */}
-                {aiResponse && (
+                {aiResponseData && (
                   <div style={{
-                    marginTop: '12px',
-                    padding: '12px 14px',
-                    background: '#ffffff',
-                    borderRadius: '12px',
-                    border: '1px solid #e2e8f0',
-                    fontSize: '13px',
-                    color: '#334155',
-                    lineHeight: '1.5',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
+                    marginTop: '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px'
                   }}>
-                    <div style={{ fontWeight: '750', color: '#1e3a8a', fontSize: '11px', textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.5px' }}>Response</div>
-                    <div style={{ whiteSpace: 'pre-wrap' }}>{aiResponse}</div>
+                    {/* Direct Response Text */}
+                    <div style={{
+                      padding: '12px 14px',
+                      background: '#ffffff',
+                      borderRadius: '12px',
+                      border: '1px solid #fecdd3',
+                      fontSize: '13.5px',
+                      color: '#334155',
+                      lineHeight: '1.5',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
+                    }}>
+                      <div style={{ fontWeight: '750', color: '#be123c', fontSize: '11px', textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.5px' }}>AI Answer</div>
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{aiResponseData.response}</div>
+                    </div>
+
+                    {/* AI Recommended Precautions */}
+                    {aiResponseData.precautions && aiResponseData.precautions.length > 0 && (
+                      <div style={{
+                        padding: '12px 14px',
+                        background: '#fffbfb',
+                        borderRadius: '12px',
+                        border: '1px solid #ffe4e6',
+                        fontSize: '13px',
+                        color: '#475569',
+                      }}>
+                        <div style={{ fontWeight: '750', color: '#be123c', fontSize: '11px', textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Shield size={12} color="#be123c" /> Recommended Precautions
+                        </div>
+                        <ul style={{ margin: 0, paddingLeft: '18px', lineHeight: '1.5' }}>
+                          {aiResponseData.precautions.map((p, idx) => (
+                            <li key={idx} style={{ marginBottom: '4px' }}>{p}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Nearby Emergency Resources */}
+                    {nearbyPlaces && nearbyPlaces.length > 0 && (
+                      <div style={{
+                        padding: '12px 14px',
+                        background: '#fffafb',
+                        borderRadius: '12px',
+                        border: '1px solid #ffe4e6',
+                        fontSize: '13px',
+                        color: '#475569',
+                      }}>
+                        <div style={{ fontWeight: '750', color: '#be123c', fontSize: '11px', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <AlertCircle size={12} color="#be123c" /> Nearby Emergency Resources
+                        </div>
+                        
+                        {/* Hospitals */}
+                        {nearbyPlaces.filter(p => p.type === 'hospital').length > 0 && (
+                          <div style={{ marginBottom: '8px' }}>
+                            <div style={{ fontSize: '11px', fontWeight: '600', color: '#e11d48', textTransform: 'uppercase', marginBottom: '4px' }}>Hospitals</div>
+                            {nearbyPlaces.filter(p => p.type === 'hospital').slice(0, 2).map((p, i) => (
+                              <div key={`ai-h-${i}`} style={{ background: '#ffffff', padding: '6px 8px', borderRadius: '8px', border: '1px solid #ffe4e6', marginBottom: '4px' }}>
+                                <div style={{ fontWeight: '600', color: '#1e293b', fontSize: '12px' }}>{p.name}</div>
+                                {p.address && <div style={{ fontSize: '11px', color: '#64748b' }}>{p.address}</div>}
+                                {p.phone && <div style={{ fontSize: '11px', color: '#e11d48', fontWeight: '600' }}>{p.phone}</div>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Pharmacies */}
+                        {nearbyPlaces.filter(p => p.type === 'pharmacy').length > 0 && (
+                          <div>
+                            <div style={{ fontSize: '11px', fontWeight: '600', color: '#16a34a', textTransform: 'uppercase', marginBottom: '4px' }}>Medical Stores</div>
+                            {nearbyPlaces.filter(p => p.type === 'pharmacy').slice(0, 2).map((p, i) => (
+                              <div key={`ai-p-${i}`} style={{ background: '#ffffff', padding: '6px 8px', borderRadius: '8px', border: '1px solid #ffe4e6', marginBottom: '4px' }}>
+                                <div style={{ fontWeight: '600', color: '#1e293b', fontSize: '12px' }}>{p.name}</div>
+                                {p.address && <div style={{ fontSize: '11px', color: '#64748b' }}>{p.address}</div>}
+                                {p.phone && <div style={{ fontSize: '11px', color: '#16a34a', fontWeight: '600' }}>{p.phone}</div>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
-
-              {/* Vulnerability chips */}
-              {advisory.vulnerable_info && (
-                <div style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
-                  <div className="chip-row" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    <div className="chip" style={{ fontSize: 12, padding: '2px 6px', display: 'flex', alignItems: 'center', gap: '4px', background: '#ffffff', border: '1px solid #e2e8f0' }}>
-                      <Building2 size={13} color="#3b82f6" />
-                      <span>{advisory.vulnerable_info.hospitals} Hosp.</span>
-                    </div>
-                    <div className="chip" style={{ fontSize: 12, padding: '2px 6px', display: 'flex', alignItems: 'center', gap: '4px', background: '#ffffff', border: '1px solid #e2e8f0' }}>
-                      <Building2 size={13} color="#f59e0b" />
-                      <span>{advisory.vulnerable_info.schools} Schools</span>
-                    </div>
-                    <div className="chip" style={{ fontSize: 12, padding: '2px 6px', display: 'flex', alignItems: 'center', gap: '4px', background: '#ffffff', border: '1px solid #e2e8f0' }}>
-                      <Users size={13} color="#10b981" />
-                      <span>{advisory.vulnerable_info.elderly_pct}% Elderly</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Emergency Resources — Nearby Hospitals & Medical Stores */}
-              <div style={{ marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <AlertCircle size={14} color="#ef4444" /> Nearby Emergency Resources
-                </div>
-                {nearbyLoading ? (
-                  <div style={{ fontSize: 13, color: 'var(--text-muted)', padding: '8px 0' }}>Searching nearby hospitals & medical stores...</div>
-                ) : nearbyPlaces && nearbyPlaces.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {nearbyPlaces.filter(p => p.type === 'hospital').length > 0 && (
-                      <div>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <Building2 size={13} color="#ef4444" />
-                          <span>Hospitals</span>
-                        </div>
-                        {nearbyPlaces.filter(p => p.type === 'hospital').slice(0, 3).map((p, i) => (
-                          <div key={`h-${i}`} style={{ 
-                            background: 'linear-gradient(to right, rgba(239, 68, 68, 0.04), rgba(239, 68, 68, 0.01))', 
-                            padding: '12px 14px', 
-                            borderRadius: '12px', 
-                            marginBottom: '8px', 
-                            fontSize: '13.5px', 
-                            border: '1px solid rgba(239, 68, 68, 0.1)',
-                            borderLeft: '4px solid #ef4444',
-                            boxShadow: '0 4px 12px rgba(239, 68, 68, 0.02)'
-                          }}>
-                            <div style={{ fontWeight: 650, color: '#1e293b' }}>{p.name}</div>
-                            {p.address && <div style={{ color: '#64748b', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '4px' }}><MapPin size={11} color="#94a3b8" /> {p.address}</div>}
-                            {p.phone && <div style={{ color: '#ef4444', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '4px', fontWeight: '600' }}><Phone size={11} color="#ef4444" /> {p.phone}</div>}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {nearbyPlaces.filter(p => p.type === 'pharmacy').length > 0 && (
-                      <div>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: '#22c55e', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <Activity size={13} color="#22c55e" />
-                          <span>Medical Stores / Pharmacies</span>
-                        </div>
-                        {nearbyPlaces.filter(p => p.type === 'pharmacy').slice(0, 3).map((p, i) => (
-                          <div key={`p-${i}`} style={{ 
-                            background: 'linear-gradient(to right, rgba(34, 197, 94, 0.04), rgba(34, 197, 94, 0.01))', 
-                            padding: '12px 14px', 
-                            borderRadius: '12px', 
-                            marginBottom: '8px', 
-                            fontSize: '13.5px', 
-                            border: '1px solid rgba(34, 197, 94, 0.1)',
-                            borderLeft: '4px solid #22c55e',
-                            boxShadow: '0 4px 12px rgba(34, 197, 94, 0.02)'
-                          }}>
-                            <div style={{ fontWeight: 650, color: '#1e293b' }}>{p.name}</div>
-                            {p.address && <div style={{ color: '#64748b', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '4px' }}><MapPin size={11} color="#94a3b8" /> {p.address}</div>}
-                            {p.phone && <div style={{ color: '#22c55e', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '4px', fontWeight: '600' }}><Phone size={11} color="#22c55e" /> {p.phone}</div>}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ) : nearbyPlaces && nearbyPlaces.length === 0 ? (
-                  <div style={{ fontSize: 13, color: 'var(--text-muted)', padding: '6px 0' }}>No hospitals or pharmacies found within 3 km radius.</div>
-                ) : null}
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>Emergency Helpline: <span style={{ color: '#ef4444', fontWeight: 700 }}>112</span> | Ambulance: <span style={{ color: '#ef4444', fontWeight: 700 }}>108</span></div>
-              </div>
-
-              <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
-                Generated at {new Date(advisory.generated_at).toLocaleTimeString()}
               </div>
             </div>
           ) : (
@@ -3702,18 +3602,18 @@ function PersonalAlertSubscriptionPopup({
 
       {/* Floating Popup Card */}
       {isOpen && (
-        <div className="advisory-popup-card" style={{ width: '360px' }}>
+        <div className="advisory-popup-card" style={{ width: '360px', background: '#f0f7ff', border: '1.5px solid #bfdbfe', boxShadow: '0 10px 40px rgba(59, 130, 246, 0.08)' }}>
           <div className="advisory-popup-header">
             <div>
               <div className="advisory-popup-title">
                 <Bell size={18} color="#3b82f6" />
-                <span style={{ fontSize: '16px' }}>Personal Alert Subscription</span>
+                <span style={{ fontSize: '16px', color: '#1e3a8a' }}>Personal Alert Subscription</span>
               </div>
-              <div className="advisory-popup-subtitle" style={{ fontSize: '12px' }}>
+              <div className="advisory-popup-subtitle" style={{ fontSize: '12px', color: '#3b82f6' }}>
                 Subscribe to custom air quality alerts
               </div>
             </div>
-            <button className="advisory-close-btn" onClick={onToggle}>&times;</button>
+            <button className="advisory-close-btn" style={{ color: '#3b82f6' }} onClick={onToggle}>&times;</button>
           </div>
 
           <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
