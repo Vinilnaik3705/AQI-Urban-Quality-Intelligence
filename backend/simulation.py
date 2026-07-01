@@ -353,7 +353,8 @@ async def _fetch_real_aqi_openweather(lat: float, lng: float) -> Optional[Dict[s
 # ── WAQI API (Hugging Face / CPCB Ground Stations) ───────────────────────────
 
 def _get_waqi_token() -> Optional[str]:
-    """Retrieve the WAQI API token from the environment variables or the local .env file."""
+    """Retrieve the WAQI API token from the environment variables or the local .env file.
+    Falls back to the public 'demo' token if none is configured."""
     token = os.environ.get("WAQI_TOKEN")
     if token:
         return token
@@ -366,7 +367,7 @@ def _get_waqi_token() -> Optional[str]:
                         return line.strip().split("=", 1)[1].strip()
     except Exception:
         pass
-    return None
+    return "demo"
 
 
 def _usepa_aqi_to_concentration(aqi: float, bps: list) -> float:
@@ -376,7 +377,10 @@ def _usepa_aqi_to_concentration(aqi: float, bps: list) -> float:
             if aqi_hi == aqi_lo:
                 return conc_lo
             return conc_lo + (aqi - aqi_lo) * (conc_hi - conc_lo) / (aqi_hi - aqi_lo)
-    return aqi
+    # If no match found, return a reasonable default based on lowest breakpoint
+    if bps:
+        return bps[0][0]
+    return 0.0
 
 
 async def _fetch_real_aqi_waqi(lat: float, lng: float) -> Optional[Dict[str, Any]]:
@@ -398,13 +402,13 @@ async def _fetch_real_aqi_waqi(lat: float, lng: float) -> Optional[Dict[str, Any
                 if data.get("status") == "ok":
                     aq_data = data.get("data", {})
 
-                    # Reject data older than 3 hours (10800s) — WAQI stations update hourly
+                    # Reject data older than 12 hours (43200s) — handles timezone offsets safely
                     meas_time = aq_data.get("time", {}).get("v")
                     if meas_time:
                         import time as _time
                         current_ts = int(_time.time())
                         age_s = abs(current_ts - meas_time)
-                        if age_s > 10800:
+                        if age_s > 43200:
                             city_key = get_nearest_live_city(lat, lng)
                             print(f"WAQI data for {city_key} is stale ({age_s}s old). Reverting to fallback.")
                             return None
@@ -449,10 +453,10 @@ async def _fetch_real_aqi_waqi(lat: float, lng: float) -> Optional[Dict[str, Any
                         "so2":    round(so2_ug, 1),
                         "co":     round(co_mg, 2),
                         "o3":     round(o3_ug, 1),
-                        "source": f"waqi (live, {city_name})"
+                        "source": "waqi-cpcb (live)",
                     }
     except Exception as e:
-        print(f"WAQI fetch failed for ({lat:.4f},{lng:.4f}): {e}")
+        print("WAQI CPCB request failed:", e)
     return None
 
 
@@ -514,8 +518,14 @@ def _us_aqi_to_pm10(aqi_val: float) -> float:
 
 
 async def _fetch_real_aqi(lat: float, lng: float) -> Optional[Dict[str, Any]]:
-    """Fetch real-time air quality. Uses OpenWeatherMap first, then falls back to Open-Meteo with corrections."""
-    # 0. Attempt OpenWeatherMap
+    """Fetch real-time air quality. Prioritizes real CPCB ground stations (WAQI) first,
+    then falls back to OpenWeatherMap, then Open-Meteo."""
+    # 0. Attempt WAQI (real CPCB monitoring stations)
+    waqi_data = await _fetch_real_aqi_waqi(lat, lng)
+    if waqi_data:
+        return waqi_data
+
+    # 1. Attempt OpenWeatherMap
     owm_data = await _fetch_real_aqi_openweather(lat, lng)
     if owm_data:
         return owm_data

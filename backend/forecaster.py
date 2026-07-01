@@ -511,21 +511,31 @@ class AQIForecaster:
                                   now_idx: int, target_idx: int, h: int,
                                   city_baseline_aqi: float,
                                   forecast_weather: Optional[Dict[str, Any]],
-                                  fw_offset: int) -> List[float]:
+                                  fw_offset: int,
+                                  current_aqi: float) -> List[float]:
         """Build a single feature vector for inference at horizon h."""
-        aqi_now = aqi_series[now_idx]
-        aqi_lag1 = aqi_series[max(0, now_idx - 1)]
-        aqi_lag3 = aqi_series[max(0, now_idx - 3)]
-        aqi_lag6 = aqi_series[max(0, now_idx - 6)]
-        aqi_lag24 = aqi_series[max(0, now_idx - 24)]
+        scale_factor = current_aqi / max(1.0, aqi_series[now_idx])
+
+        aqi_now = current_aqi
+        aqi_lag1 = aqi_series[max(0, now_idx - 1)] * scale_factor
+        aqi_lag3 = aqi_series[max(0, now_idx - 3)] * scale_factor
+        aqi_lag6 = aqi_series[max(0, now_idx - 6)] * scale_factor
+        aqi_lag24 = aqi_series[max(0, now_idx - 24)] * scale_factor
 
         # AQI momentum
         momentum_1h = aqi_now - aqi_lag1
         momentum_3h = aqi_now - aqi_lag3
         momentum_6h = aqi_now - aqi_lag6
 
-        mean6, std6, _, _ = self._rolling_stats(aqi_series, now_idx, 6)
-        mean24, std24, min24, max24 = self._rolling_stats(aqi_series, now_idx, 24)
+        raw_mean6, raw_std6, _, _ = self._rolling_stats(aqi_series, now_idx, 6)
+        mean6 = raw_mean6 * scale_factor
+        std6 = raw_std6 * scale_factor
+
+        raw_mean24, raw_std24, raw_min24, raw_max24 = self._rolling_stats(aqi_series, now_idx, 24)
+        mean24 = raw_mean24 * scale_factor
+        std24 = raw_std24 * scale_factor
+        min24 = raw_min24 * scale_factor
+        max24 = raw_max24 * scale_factor
 
         # Current weather
         ws_now = data["wind_speed"][-1] if data["wind_speed"] else 5.0
@@ -641,7 +651,14 @@ class AQIForecaster:
         city_baseline = model_info["city_baseline_aqi"]
 
         now_idx = len(aqi_series) - 1
-        current_aqi = aqi_series[now_idx]
+        
+        # Anchor the forecast starting point exactly to the real-time CPCB ground station reading
+        from simulation import _fetch_real_aqi
+        real_aqi_data = await _fetch_real_aqi(lat, lng)
+        if real_aqi_data:
+            current_aqi = real_aqi_data["aqi"]
+        else:
+            current_aqi = aqi_series[now_idx]
 
         # ── Predict at anchor horizons ──
         anchor_hours = []
@@ -658,6 +675,7 @@ class AQIForecaster:
             features = self._build_inference_features(
                 aqi_series, data, now_idx, now_idx + h, h,
                 city_baseline, forecast_weather, h - 1,
+                current_aqi,
             )
 
             delta_pred = float(models[h].predict([features])[0])
